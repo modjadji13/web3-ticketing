@@ -1,0 +1,6 @@
+node_modules/
+.tools/
+dist/
+*.log
+*.err.log
+npm-latest.json
