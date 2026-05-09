@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { clusterApiUrl, Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 
 const API_URL = 'http://127.0.0.1:8090';
+const SOLANA_RPC_URL = clusterApiUrl('devnet');
+const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
 
 function App() {
   const [page, setPage] = useState('events');
@@ -8,7 +11,9 @@ function App() {
   const [seats, setSeats] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [selectedSeat, setSelectedSeat] = useState(null);
-  const [wallet, setWallet] = useState('0x4D...91F2');
+  const [wallet, setWallet] = useState('');
+  const [walletProvider, setWalletProvider] = useState(null);
+  const [solBalance, setSolBalance] = useState(null);
   const [ticket, setTicket] = useState(null);
   const [verifyForm, setVerifyForm] = useState({
     eventId: '',
@@ -20,6 +25,7 @@ function App() {
 
   useEffect(() => {
     loadEvents();
+    detectWallet();
   }, []);
 
   const sortedSeats = useMemo(() => {
@@ -37,6 +43,50 @@ function App() {
       throw new Error(data.error || 'Request failed');
     }
     return data;
+  }
+
+  function detectWallet() {
+    const provider = window.solana?.isPhantom ? window.solana : null;
+    setWalletProvider(provider);
+  }
+
+  async function connectWallet() {
+    setLoading(true);
+    setMessage('');
+    try {
+      if (!walletProvider) {
+        throw new Error('Install Phantom wallet and switch it to Devnet.');
+      }
+      const result = await walletProvider.connect();
+      const address = result.publicKey.toString();
+      setWallet(address);
+      await loadSolBalance(address);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadSolBalance(address = wallet) {
+    if (!address) return;
+    const publicKey = new PublicKey(address);
+    const balance = await connection.getBalance(publicKey);
+    setSolBalance(balance / LAMPORTS_PER_SOL);
+  }
+
+  async function signCheckoutMessage() {
+    if (!walletProvider?.signMessage) {
+      return `unsigned-${Date.now()}`;
+    }
+
+    const message = new TextEncoder().encode(
+      `Reserve ${selectedEvent.name} seat ${selectedSeat.id} on Solana devnet`,
+    );
+    const signed = await walletProvider.signMessage(message, 'utf8');
+    return Array.from(signed.signature)
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('');
   }
 
   async function loadEvents() {
@@ -69,6 +119,11 @@ function App() {
   }
 
   async function holdSeat(seat) {
+    if (!wallet) {
+      setMessage('Connect Phantom before holding a seat.');
+      return;
+    }
+
     setLoading(true);
     setMessage('');
     try {
@@ -87,16 +142,22 @@ function App() {
   }
 
   async function reserveSeat() {
+    if (!wallet) {
+      setMessage('Connect Phantom before reserving a ticket.');
+      return;
+    }
+
     setLoading(true);
     setMessage('');
     try {
+      const signature = await signCheckoutMessage();
       const result = await request(
         `/api/events/${selectedEvent.id}/seats/${selectedSeat.id}/reserve`,
         {
           method: 'POST',
           body: JSON.stringify({
             wallet_address: wallet,
-            payment_signature: `demo-${Date.now()}`,
+            payment_signature: signature,
             metadata_uri: `ipfs://ticket-${selectedEvent.id}-${selectedSeat.id}`,
           }),
         },
@@ -150,6 +211,24 @@ function App() {
           <button onClick={() => setPage('verify')}>Verify</button>
         </nav>
       </header>
+
+      <section className="wallet-panel">
+        <div>
+          <strong>{wallet ? shortAddress(wallet) : 'No wallet connected'}</strong>
+          <small>
+            Solana devnet {solBalance === null ? '' : `· ${solBalance.toFixed(4)} SOL`}
+          </small>
+        </div>
+        <div className="wallet-actions">
+          <button onClick={connectWallet}>{wallet ? 'Reconnect Phantom' : 'Connect Phantom'}</button>
+          <button disabled={!wallet} onClick={() => loadSolBalance()}>
+            Refresh SOL
+          </button>
+          <a href="https://faucet.solana.com/" target="_blank" rel="noreferrer">
+            Devnet faucet
+          </a>
+        </div>
+      </section>
 
       {message && <p className="message">{message}</p>}
       {loading && <p className="muted">Loading...</p>}
@@ -210,6 +289,8 @@ function App() {
             <dd>
               <input value={wallet} onChange={(event) => setWallet(event.target.value)} />
             </dd>
+            <dt>Network</dt>
+            <dd>Solana devnet</dd>
           </dl>
           <button className="primary" onClick={reserveSeat}>
             Reserve ticket
@@ -260,6 +341,10 @@ function App() {
       )}
     </main>
   );
+}
+
+function shortAddress(address) {
+  return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
 
 function titleFor(page) {
