@@ -14,6 +14,27 @@ Frontend:
 http://127.0.0.1:5173
 ```
 
+## Web3 Setup
+
+- Install Phantom and switch it to Solana Devnet.
+- Get test SOL from `https://faucet.solana.com/`.
+- The frontend connects to `https://api.devnet.solana.com` through `@solana/web3.js`.
+- Seat holds and local ticket records still go through the Rust backend.
+- Checkout signs a wallet message now; the next step is replacing the local reservation placeholder with an Anchor `reserve_seat` instruction.
+
+## Partner Tracks
+
+Recommended first submissions:
+
+- ElevenLabs: voice confirmation after a ticket is reserved.
+- LI.FI: cross-chain checkout route before Solana reservation.
+
+Stretch tracks:
+
+- Ledger: hardware-wallet signing for checkout.
+- Solana Mobile: mobile wallet flow.
+- Virtuals: AI ticketing agent.
+
 ## Run Backend
 
 ```powershell
