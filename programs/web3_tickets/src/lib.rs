@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 
-declare_id!("11111111111111111111111111111111");
+declare_id!("35wzuQvuh6PkqoTe8sgZu8hx8cV4sG2G8h89zELaLmKD");
 
 #[program]
 pub mod web3_tickets {
