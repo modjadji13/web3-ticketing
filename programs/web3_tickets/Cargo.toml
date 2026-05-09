@@ -1,0 +1,19 @@
+[package]
+name = "web3_tickets"
+version = "0.1.0"
+description = "Anchor program for Web3 ticketing reservations, transfers, and verification."
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "web3_tickets"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.30.1"
