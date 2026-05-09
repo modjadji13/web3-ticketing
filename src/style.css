@@ -1,7 +1,7 @@
 :root {
   font-family: system-ui, sans-serif;
-  color: #111;
-  background: #fff;
+  color: #111827;
+  background: #f7f7f4;
 }
 
 * {
@@ -12,4 +12,157 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.app {
+  width: min(100%, 980px);
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.topbar,
+.panel-head,
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.topbar {
+  margin-bottom: 24px;
+}
+
+.topbar p,
+h1,
+h2,
+.muted {
+  margin: 0;
+}
+
+.topbar p,
+.muted,
+small {
+  color: #6b7280;
+}
+
+.topbar nav {
+  display: flex;
+  gap: 8px;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.narrow {
+  max-width: 560px;
+}
+
+.message {
+  padding: 12px;
+  border-radius: 8px;
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.row {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px;
+}
+
+.row span:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.seat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.seat {
+  min-height: 44px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ecfdf5;
+}
+
+.seat.held {
+  background: #fef3c7;
+}
+
+.seat.reserved,
+.seat.used {
+  background: #fee2e2;
+}
+
+dl,
+form {
+  display: grid;
+  gap: 12px;
+}
+
+dt {
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+dd {
+  margin: 0 0 8px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+}
+
+input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+button {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.primary {
+  width: fit-content;
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
 }
