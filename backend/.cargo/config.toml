@@ -1,0 +1,5 @@
+[build]
+target = "x86_64-pc-windows-gnu"
+
+[env]
+LIBRARY_PATH = { value = ".cargo/link-libs", relative = true }
