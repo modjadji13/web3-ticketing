@@ -4,3 +4,6 @@ dist/
 *.log
 *.err.log
 npm-latest.json
+.anchor/
+target/
+**/target/
