@@ -22,6 +22,26 @@ http://127.0.0.1:5173
 - Seat holds and local ticket records still go through the Rust backend.
 - Checkout signs a wallet message now; the next step is replacing the local reservation placeholder with an Anchor `reserve_seat` instruction.
 
+## On-Chain Program
+
+The Anchor program lives in `programs/web3_tickets`.
+
+It defines the core on-chain instructions:
+
+- `initialize_event`
+- `reserve_seat`
+- `transfer_ticket`
+- `verify_ticket`
+
+Install the Solana and Anchor CLIs before building:
+
+```powershell
+solana config set --url devnet
+anchor build
+anchor deploy
+anchor keys sync
+```
+
 ## Partner Tracks
 
 Recommended first submissions:
@@ -56,8 +76,12 @@ http://127.0.0.1:8090
 - `package-lock.json` locks the frontend dependency versions.
 - `vite.config.js` enables React support in Vite.
 - `src/main.jsx` mounts the React app.
-- `src/App.jsx` is the intentionally empty app component.
-- `src/style.css` contains the minimal base CSS reset.
+- `src/App.jsx` contains the minimal four-page ticket flow and Solana Devnet wallet connection.
+- `src/style.css` contains the minimal responsive UI styling.
+- `Anchor.toml` configures the Anchor workspace for Solana Devnet.
+- `programs/web3_tickets/Cargo.toml` defines the on-chain ticketing program package.
+- `programs/web3_tickets/Cargo.lock` locks the Anchor program dependency versions.
+- `programs/web3_tickets/src/lib.rs` implements event creation, seat reservation, ticket transfer, and ticket verification on-chain.
 - `backend/Cargo.toml` defines the Rust backend package and dependencies.
 - `backend/Cargo.lock` locks the Rust dependency versions.
 - `backend/.gitignore` keeps Rust build output out of Git.
