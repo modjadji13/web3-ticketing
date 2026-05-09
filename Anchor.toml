@@ -3,7 +3,7 @@ seeds = false
 skip-lint = false
 
 [programs.devnet]
-web3_tickets = "11111111111111111111111111111111"
+web3_tickets = "35wzuQvuh6PkqoTe8sgZu8hx8cV4sG2G8h89zELaLmKD"
 
 [registry]
 url = "https://api.apr.dev"
