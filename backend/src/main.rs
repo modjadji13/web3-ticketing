@@ -84,6 +84,8 @@ struct Ticket {
     event_id: Uuid,
     seat_id: String,
     owner_wallet: String,
+    onchain_ticket_address: Option<String>,
+    payment_signature: Option<String>,
     mint_address: String,
     metadata_uri: String,
     price_lamports: u64,
@@ -136,6 +138,7 @@ struct HoldSeatRequest {
 struct ReserveSeatRequest {
     wallet_address: String,
     payment_signature: Option<String>,
+    onchain_ticket_address: Option<String>,
     metadata_uri: Option<String>,
 }
 
@@ -373,6 +376,8 @@ async fn reserve_seat(
         event_id,
         seat_id: seat_id.clone(),
         owner_wallet: payload.wallet_address,
+        onchain_ticket_address: payload.onchain_ticket_address,
+        payment_signature: payload.payment_signature.clone(),
         mint_address: format!("cNFT-{}", Uuid::new_v4()),
         metadata_uri: payload
             .metadata_uri
