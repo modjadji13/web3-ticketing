@@ -199,6 +199,16 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, status, ticket }) {
 }
 
 function SolanaPaymentModal({ email, isBuying, onClose, onPay, status, ticket }) {
+  const [phantomInstalled, setPhantomInstalled] = useState(() => Boolean(window.solana?.isPhantom));
+
+  function refreshWalletStatus() {
+    setPhantomInstalled(Boolean(window.solana?.isPhantom));
+  }
+
+  function openPhantomInstall() {
+    window.open('https://phantom.app/download', '_blank', 'noopener,noreferrer');
+  }
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4">
       <div className="w-full max-w-[480px] rounded-2xl bg-white shadow-2xl">
@@ -243,8 +253,32 @@ function SolanaPaymentModal({ email, isBuying, onClose, onPay, status, ticket })
           </div>
 
           <div className="mt-5 rounded-xl border border-[#dbeafe] bg-[#eff6ff] p-4 text-[14px] text-[#1d4ed8]">
-            Phantom must be installed and switched to Devnet. This demo signs the ticket reservation
-            transaction with your wallet and then records the ticket in the backend.
+            <div className="font-bold">
+              {phantomInstalled ? 'Phantom detected' : 'Phantom wallet required'}
+            </div>
+            <p className="mt-1">
+              {phantomInstalled
+                ? 'Switch Phantom to Devnet before paying. The app signs the reservation transaction with your wallet and records the ticket in the backend.'
+                : 'Install Phantom, enable it in your browser, then return here and check again.'}
+            </p>
+            {!phantomInstalled && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  className="rounded-md bg-[#1d4ed8] px-3 py-2 text-[13px] font-bold text-white hover:bg-[#1e40af]"
+                  onClick={openPhantomInstall}
+                  type="button"
+                >
+                  Install Phantom
+                </button>
+                <button
+                  className="rounded-md border border-[#93c5fd] bg-white px-3 py-2 text-[13px] font-bold text-[#1d4ed8] hover:bg-[#dbeafe]"
+                  onClick={refreshWalletStatus}
+                  type="button"
+                >
+                  I installed it
+                </button>
+              </div>
+            )}
           </div>
 
           {status && <p className="mt-4 text-[14px] text-[#0a58ca]">{status}</p>}
@@ -256,11 +290,17 @@ function SolanaPaymentModal({ email, isBuying, onClose, onPay, status, ticket })
 
           <button
             className="mt-5 w-full rounded-lg bg-[#417516] py-3.5 text-[16px] font-bold text-white transition-colors hover:bg-[#345c12] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isBuying || Boolean(ticket)}
+            disabled={isBuying || Boolean(ticket) || !phantomInstalled}
             onClick={onPay}
             type="button"
           >
-            {isBuying ? 'Opening Phantom...' : ticket ? 'Payment complete' : 'Pay with Phantom'}
+            {isBuying
+              ? 'Opening Phantom...'
+              : ticket
+                ? 'Payment complete'
+                : phantomInstalled
+                  ? 'Pay with Phantom'
+                  : 'Install Phantom first'}
           </button>
           <button
             className="mt-3 w-full rounded-lg border border-gray-300 py-3 text-[15px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
