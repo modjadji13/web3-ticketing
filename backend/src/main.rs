@@ -354,6 +354,24 @@ async fn reserve_seat(
         .cloned()
         .ok_or_else(|| not_found("event not found"))?;
 
+    // Repeated checkout attempts from the same wallet should return the
+    // existing ticket instead of failing the demo flow after a refresh/retry.
+    if let Some(ticket) = existing_reserved_ticket(&store, event_id, &seat_id) {
+        if ticket.owner_wallet == payload.wallet_address {
+            return Ok(Json(ReserveSeatResponse {
+                payment_signature: payload
+                    .payment_signature
+                    .clone()
+                    .or_else(|| ticket.payment_signature.clone()),
+                ticket,
+                reserve_instruction: "reserve_seat",
+                mint_instruction: "mint_ticket",
+            }));
+        }
+
+        return Err(bad_request("seat is already reserved"));
+    }
+
     enforce_wallet_limit(
         &store,
         event_id,
@@ -554,7 +572,10 @@ fn generate_jcole_seats() -> HashMap<String, Seat> {
 
     let sections = fnb_stadium_sections();
     let total_capacity: u32 = sections.iter().map(|section| section.capacity).sum();
-    assert_eq!(total_capacity, 90_000, "FNB demo inventory must equal 90,000 seats");
+    assert_eq!(
+        total_capacity, 90_000,
+        "FNB demo inventory must equal 90,000 seats"
+    );
 
     for section in sections {
         for index in 1..=section.capacity {
@@ -730,6 +751,15 @@ fn get_seat_mut<'a>(
         .ok_or_else(|| not_found("event seats not found"))?
         .get_mut(seat_id)
         .ok_or_else(|| not_found("seat not found"))
+}
+
+fn existing_reserved_ticket(store: &Store, event_id: Uuid, seat_id: &str) -> Option<Ticket> {
+    let seat = store.seats.get(&event_id)?.get(seat_id)?;
+    if seat.status != SeatStatus::Reserved {
+        return None;
+    }
+
+    store.tickets.get(&seat.ticket_id?).cloned()
 }
 
 fn read_store(state: &AppState) -> Result<std::sync::RwLockReadGuard<'_, Store>, ApiError> {
