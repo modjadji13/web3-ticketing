@@ -191,97 +191,11 @@ function SellingFast({ centered = false }) {
 
 function StadiumMap({ mini = false }) {
   return (
-    <svg className="w-full h-full absolute inset-0" viewBox="0 0 800 800">
-      <defs>
-        <path
-          d="M 520 735 L 340 735 A 255 255 0 0 1 85 480 L 85 320 A 255 255 0 0 1 340 65 L 520 65"
-          id="tier4"
-          pathLength="1000"
-        />
-        <path
-          d="M 520 695 L 340 695 A 215 215 0 0 1 125 480 L 125 320 A 215 215 0 0 1 340 105 L 520 105"
-          id="tierL"
-          pathLength="1000"
-        />
-        <path
-          d="M 520 665 L 340 665 A 185 185 0 0 1 155 480 L 155 320 A 185 185 0 0 1 340 135 L 520 135"
-          id="tier2"
-          pathLength="1000"
-        />
-        <path
-          d="M 520 620 L 340 620 A 140 140 0 0 1 200 480 L 200 320 A 140 140 0 0 1 340 180 L 520 180"
-          id="tier1"
-          pathLength="1000"
-        />
-        <style>
-          {`
-            .base-gray { fill: none; stroke: #e5e5e5; }
-            .base-green { fill: none; stroke: #b7df8a; }
-            .cut-white { fill: none; stroke: #f4f5f7; }
-            .sec-text { fill: #999; font-size: 13px; font-weight: 600; font-family: Inter, sans-serif; pointer-events: none; }
-          `}
-        </style>
-      </defs>
-      <use className="base-gray" href="#tier4" strokeWidth="60" />
-      <use className="base-gray" href="#tierL" strokeWidth="12" />
-      <use className="base-gray" href="#tier2" strokeWidth="40" />
-      <use className="base-gray" href="#tier1" strokeWidth="40" />
-      <use
-        className="base-green"
-        href="#tier4"
-        strokeDasharray={mini ? '26 1000' : '720 1000'}
-        strokeDashoffset={mini ? '-494' : '-130'}
-        strokeWidth="60"
-      />
-      {!mini && (
-        <>
-          <use className="base-green" href="#tier2" strokeDasharray="30 1000" strokeDashoffset="-190" strokeWidth="40" />
-          <use className="base-green" href="#tier2" strokeDasharray="30 1000" strokeDashoffset="-270" strokeWidth="40" />
-          <use className="base-green" href="#tier2" strokeDasharray="30 1000" strokeDashoffset="-730" strokeWidth="40" />
-          <use className="base-green" href="#tier1" strokeDasharray="30 1000" strokeDashoffset="-190" strokeWidth="40" />
-          <use className="base-green" href="#tier1" strokeDasharray="30 1000" strokeDashoffset="-730" strokeWidth="40" />
-          <use className="base-green" href="#tier1" strokeDasharray="30 1000" strokeDashoffset="-920" strokeWidth="40" />
-        </>
-      )}
-      <use className="cut-white" href="#tier4" strokeDasharray="2 23.8" strokeWidth="62" />
-      <use className="cut-white" href="#tierL" strokeDasharray="2 30" strokeWidth="14" />
-      <use className="cut-white" href="#tier2" strokeDasharray="2 31.5" strokeWidth="42" />
-      <use className="cut-white" href="#tier1" strokeDasharray="2 38.5" strokeWidth="42" />
-      <path d="M 520 642 L 340 642 A 162 162 0 0 1 178 480 L 178 320 A 162 162 0 0 1 340 158 L 520 158" fill="none" stroke="#f4f5f7" strokeWidth="4" />
-      <path d="M 520 687 L 340 687 A 207 207 0 0 1 133 480 L 133 320 A 207 207 0 0 1 340 113 L 520 113" fill="none" stroke="#f4f5f7" strokeWidth="4" />
-      <path d="M 520 703 L 340 703 A 223 223 0 0 1 117 480 L 117 320 A 223 223 0 0 1 340 97 L 520 97" fill="none" stroke="#f4f5f7" strokeWidth="4" />
-      <rect fill={mini ? 'none' : '#b7df8a'} height="320" rx="35" stroke="#ffffff" strokeWidth="4" width="180" x="290" y="240" />
-      <line opacity="0.8" stroke="#ffffff" strokeWidth="2" x1="380" x2="380" y1="240" y2="560" />
-      <circle cx="380" cy="400" fill="none" opacity="0.8" r="40" stroke="#ffffff" strokeWidth="2" />
-      <rect fill="#ffffff" height="30" width="40" x="465" y="385" />
-      <rect fill="#999999" height="200" rx="2" width="45" x="580" y="300" />
-      <rect fill="#999999" height="24" width="110" x="475" y="388" />
-      <text fill="#222" fontFamily="sans-serif" fontSize="16" fontWeight="bold" letterSpacing="4" textAnchor="middle" transform="rotate(-90 610,400)" x="610" y="400">
-        STAGE
-      </text>
-      {mini && <circle cx="230" cy="245" fill="#b7df8a" fillOpacity="0.35" r="45" stroke="#92c855" strokeWidth="3" />}
-      <text className="sec-text" dominantBaseline="central" textAnchor="middle">
-        <textPath href="#tier4" startOffset="143">524</textPath>
-        <textPath href="#tier4" startOffset="247">528</textPath>
-        <textPath href="#tier4" startOffset="351">532</textPath>
-        <textPath href="#tier4" startOffset="455">536</textPath>
-        <textPath href="#tier4" startOffset="507">538</textPath>
-        <textPath href="#tier4" startOffset="559">540</textPath>
-        <textPath href="#tier4" startOffset="663">544</textPath>
-        <textPath href="#tier2" startOffset="205">222</textPath>
-        <textPath href="#tier2" startOffset="285">225</textPath>
-        <textPath href="#tier2" startOffset="745">231</textPath>
-        <textPath href="#tier1" startOffset="205">131</textPath>
-        <textPath href="#tier1" startOffset="745">146</textPath>
-        <textPath href="#tier1" startOffset="935">103</textPath>
-      </text>
-      <text fill="#2d5214" fontFamily="sans-serif" fontSize="12" fontWeight="600" letterSpacing="1.5" opacity="0.8" textAnchor="middle" transform="rotate(-90 330,400)" x="330" y="400">
-        GENERAL ADMISSION
-      </text>
-      <text fill="#2d5214" fontFamily="sans-serif" fontSize="12" fontWeight="600" letterSpacing="1.5" opacity="0.8" textAnchor="middle" transform="rotate(-90 430,400)" x="430" y="400">
-        FRONT ZONE
-      </text>
-    </svg>
+    <img
+      alt={mini ? 'Selected section on FNB Stadium map' : 'FNB Stadium seating map'}
+      className="absolute inset-0 h-full w-full object-contain select-none pointer-events-none"
+      src="/maps/fnb-stadium-map.svg"
+    />
   );
 }
 
