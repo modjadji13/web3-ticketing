@@ -10,6 +10,8 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, status, ticket }) {
   const [googleReady, setGoogleReady] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [authMessage, setAuthMessage] = useState('');
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [confirmedEmail, setConfirmedEmail] = useState('');
 
   const emailIsValid = useMemo(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), [email]);
 
@@ -45,8 +47,13 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, status, ticket }) {
       return;
     }
 
+    setConfirmedEmail(email);
     setAuthMessage(`Checkout email confirmed: ${email}`);
-    onBuy({ email });
+    setPaymentModalOpen(true);
+  }
+
+  function handleSolanaPayment() {
+    onBuy({ email: confirmedEmail || email });
   }
 
   function handleGoogleSignIn() {
@@ -176,7 +183,95 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, status, ticket }) {
           </div>
         </div>
       </main>
+      {paymentModalOpen && (
+        <SolanaPaymentModal
+          email={confirmedEmail || email}
+          isBuying={isBuying}
+          onClose={() => setPaymentModalOpen(false)}
+          onPay={handleSolanaPayment}
+          status={status}
+          ticket={ticket}
+        />
+      )}
       <Footer />
+    </div>
+  );
+}
+
+function SolanaPaymentModal({ email, isBuying, onClose, onPay, status, ticket }) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-[480px] rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b border-gray-200 px-6 py-5">
+          <div>
+            <h2 className="text-[22px] font-bold text-gray-900">Solana payment</h2>
+            <p className="mt-1 text-[14px] text-gray-500">Pay on Solana Devnet to reserve your ticket.</p>
+          </div>
+          <button
+            aria-label="Close payment modal"
+            className="rounded-full px-2 text-[24px] leading-none text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+            disabled={isBuying}
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="px-6 py-5">
+          <div className="rounded-xl border border-gray-200 bg-[#fbfbfb] p-4">
+            <div className="flex justify-between gap-4 text-[15px]">
+              <span className="text-gray-500">Event</span>
+              <span className="font-bold text-gray-900">J. Cole</span>
+            </div>
+            <div className="mt-3 flex justify-between gap-4 text-[15px]">
+              <span className="text-gray-500">Seat</span>
+              <span className="font-bold text-gray-900">Section 538 - Row G</span>
+            </div>
+            <div className="mt-3 flex justify-between gap-4 text-[15px]">
+              <span className="text-gray-500">Network</span>
+              <span className="font-bold text-[#147a38]">Solana Devnet</span>
+            </div>
+            <div className="mt-3 flex justify-between gap-4 text-[15px]">
+              <span className="text-gray-500">Email</span>
+              <span className="max-w-[260px] truncate font-medium text-gray-900">{email}</span>
+            </div>
+            <div className="mt-3 flex justify-between gap-4 border-t border-gray-200 pt-3 text-[16px]">
+              <span className="font-bold text-gray-900">Total</span>
+              <span className="font-bold text-gray-900">R935</span>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-[#dbeafe] bg-[#eff6ff] p-4 text-[14px] text-[#1d4ed8]">
+            Phantom must be installed and switched to Devnet. This demo signs the ticket reservation
+            transaction with your wallet and then records the ticket in the backend.
+          </div>
+
+          {status && <p className="mt-4 text-[14px] text-[#0a58ca]">{status}</p>}
+          {ticket && (
+            <p className="mt-3 rounded-lg bg-[#e7f5e8] px-3 py-2 text-[13px] font-semibold text-[#147a38]">
+              Ticket reserved: {ticket.id} / seat {ticket.seat_id}
+            </p>
+          )}
+
+          <button
+            className="mt-5 w-full rounded-lg bg-[#417516] py-3.5 text-[16px] font-bold text-white transition-colors hover:bg-[#345c12] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isBuying || Boolean(ticket)}
+            onClick={onPay}
+            type="button"
+          >
+            {isBuying ? 'Opening Phantom...' : ticket ? 'Payment complete' : 'Pay with Phantom'}
+          </button>
+          <button
+            className="mt-3 w-full rounded-lg border border-gray-300 py-3 text-[15px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+            disabled={isBuying}
+            onClick={onClose}
+            type="button"
+          >
+            {ticket ? 'Close' : 'Cancel'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
