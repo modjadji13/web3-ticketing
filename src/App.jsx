@@ -17,7 +17,7 @@ function App() {
     ensureBackendEvent().then(setBackendEvent).catch((error) => setStatus(error.message));
   }, []);
 
-  async function buyOnDevnet() {
+  async function buyOnDevnet({ email } = {}) {
     setIsBuying(true);
     setStatus('');
     try {
@@ -27,7 +27,31 @@ function App() {
       const reservation = await reserveSeatInBackend(event, result);
       setTicket(reservation.ticket);
       setStatus(
-        `Reserved in backend and on Solana devnet: ${shortAddress(result.signature)} - ticket ${shortAddress(reservation.ticket.id)}`,
+        `Reserved in backend and on Solana devnet for ${email}: ${shortAddress(result.signature)} - ticket ${shortAddress(reservation.ticket.id)}`,
+      );
+    } catch (error) {
+      setStatus(error.message);
+    } finally {
+      setIsBuying(false);
+    }
+  }
+
+  async function buyWithDevnetTest({ email } = {}) {
+    setIsBuying(true);
+    setStatus('');
+    try {
+      const event = backendEvent || (await ensureBackendEvent());
+      setBackendEvent(event);
+      const timestamp = Date.now();
+      const result = {
+        owner: 'DevnetTestWallet111111111111111111111111111111',
+        signature: `devnet-test-payment-${timestamp}`,
+        ticketPda: `devnet-test-ticket-${timestamp}`,
+      };
+      const reservation = await reserveSeatInBackend(event, result);
+      setTicket(reservation.ticket);
+      setStatus(
+        `Devnet test checkout reserved ticket for ${email}: ${shortAddress(reservation.ticket.id)}`,
       );
     } catch (error) {
       setStatus(error.message);
@@ -50,6 +74,7 @@ function App() {
           isBuying={isBuying}
           onCheckout={() => setPage('checkout')}
           onBuy={buyOnDevnet}
+          onTestBuy={buyWithDevnetTest}
           status={status}
           ticket={ticket}
         />

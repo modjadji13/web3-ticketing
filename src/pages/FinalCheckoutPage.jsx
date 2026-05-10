@@ -4,7 +4,7 @@ import { CheckoutHeader, ChevronIcon, FinalOrderCard, Footer, GoogleIcon, Sellin
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 const googleIdentityScript = 'https://accounts.google.com/gsi/client';
 
-function FinalCheckoutPage({ isBuying, onCheckout, onBuy, status, ticket }) {
+function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, ticket }) {
   const [email, setEmail] = useState('');
   const [emailTouched, setEmailTouched] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
@@ -54,6 +54,10 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, status, ticket }) {
 
   function handleSolanaPayment() {
     onBuy({ email: confirmedEmail || email });
+  }
+
+  function handleDevnetTestPayment() {
+    onTestBuy({ email: confirmedEmail || email });
   }
 
   function handleGoogleSignIn() {
@@ -189,6 +193,7 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, status, ticket }) {
           isBuying={isBuying}
           onClose={() => setPaymentModalOpen(false)}
           onPay={handleSolanaPayment}
+          onTestPay={handleDevnetTestPayment}
           status={status}
           ticket={ticket}
         />
@@ -198,7 +203,7 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, status, ticket }) {
   );
 }
 
-function SolanaPaymentModal({ email, isBuying, onClose, onPay, status, ticket }) {
+function SolanaPaymentModal({ email, isBuying, onClose, onPay, onTestPay, status, ticket }) {
   const [phantomInstalled, setPhantomInstalled] = useState(() => Boolean(window.solana?.isPhantom));
 
   function refreshWalletStatus() {
@@ -301,6 +306,14 @@ function SolanaPaymentModal({ email, isBuying, onClose, onPay, status, ticket })
                 : phantomInstalled
                   ? 'Pay with Phantom'
                   : 'Install Phantom first'}
+          </button>
+          <button
+            className="mt-3 w-full rounded-lg bg-[#111827] py-3 text-[15px] font-bold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isBuying || Boolean(ticket)}
+            onClick={onTestPay}
+            type="button"
+          >
+            {isBuying ? 'Reserving test ticket...' : ticket ? 'Test checkout complete' : 'Devnet test checkout'}
           </button>
           <button
             className="mt-3 w-full rounded-lg border border-gray-300 py-3 text-[15px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
