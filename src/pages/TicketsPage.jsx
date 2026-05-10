@@ -11,7 +11,13 @@ import {
   Ticket,
   UserCircle,
 } from 'lucide-react';
-import { artistImage, mapSectionLabels, venueCapacity, venueSections } from '../data/ticketData';
+import {
+  artistImage,
+  stadiumSections,
+  totalVenueRemaining,
+  venueCapacity,
+  venueSections,
+} from '../data/ticketData';
 
 const ticketListings = [
   {
@@ -138,42 +144,8 @@ function TicketsPage({ onHome, onCheckout }) {
             </button>
           </div>
 
-          <div
-            className="relative mx-auto"
-            style={{
-              width: 'min(760px, calc(100% - 48px), calc((100vh - 152px) * 1.0692))',
-              aspectRatio: '1297 / 1213',
-            }}
-          >
-            <img
-              alt="FNB Stadium seating map"
-              className="h-full w-full object-contain"
-              src="/fnb-stadium-map.png"
-            />
-            <div className="absolute inset-0">
-              {mapSectionLabels.map(({ section, left, top, price, note }) => (
-                <button
-                  className="tag-box"
-                  key={`${section}-${left}-${top}`}
-                  onClick={onCheckout}
-                  style={{ left, top }}
-                  title={`Section ${section}`}
-                >
-                  <span className="text-[10px] font-extrabold text-[#1b6c15] leading-none">
-                    {section}
-                  </span>
-                  <span className="text-[13px] font-bold text-gray-900 leading-none mt-1">
-                    {price}
-                  </span>
-                  {note && (
-                    <span className="text-[11px] text-[#d9147d] font-bold mt-1 mb-0.5 leading-none">
-                      {note}
-                    </span>
-                  )}
-                  <span className="tag-arrow" />
-                </button>
-              ))}
-            </div>
+          <div className="relative mx-auto w-[min(900px,calc(100%-48px),calc((100vh-152px)*1.08))] aspect-[960/890]">
+            <SvgStadiumMap sections={stadiumSections} onCheckout={onCheckout} />
           </div>
         </div>
 
@@ -182,7 +154,7 @@ function TicketsPage({ onHome, onCheckout }) {
             <div>
               <h2 className="font-extrabold text-[18px]">{venueSections.length} sections</h2>
               <p className="text-[12px] font-semibold text-slate-500">
-                {venueCapacity.toLocaleString()} seat venue inventory
+                {venueCapacity.toLocaleString()} capacity / {totalVenueRemaining.toLocaleString()} left
               </p>
             </div>
 
@@ -241,6 +213,221 @@ function TicketsPage({ onHome, onCheckout }) {
       </section>
     </main>
   );
+}
+
+function SvgStadiumMap({ sections, onCheckout }) {
+  const byId = Object.fromEntries(sections.map((section) => [section.id, section]));
+  const svgSections = buildSvgSections(byId);
+
+  return (
+    <>
+      <svg className="h-full w-full" viewBox="0 0 960 890">
+        <path
+          d="M70 80 C180 10 420 5 760 20 C850 45 910 150 930 310 C955 520 910 760 820 850 C500 890 200 870 80 700 C30 520 25 210 70 80Z"
+          fill="#f2f2f2"
+          stroke="#d5d5d5"
+          strokeWidth="3"
+        />
+        <path
+          d="M155 115 C260 55 535 50 735 78 L740 178 C565 155 310 160 165 215Z"
+          fill="#e5e5e5"
+          stroke="white"
+          strokeWidth="3"
+        />
+        <path
+          d="M80 230 C140 180 250 150 380 150 L382 740 C245 740 135 700 82 615 C50 505 50 335 80 230Z"
+          fill="#e5e5e5"
+          stroke="white"
+          strokeWidth="3"
+        />
+        <path
+          d="M380 740 C530 775 735 735 820 630 L825 745 C730 850 500 870 300 835Z"
+          fill="#e5e5e5"
+          stroke="white"
+          strokeWidth="3"
+        />
+        <path
+          d="M745 205 C830 275 855 590 790 680 L640 620 C690 535 695 355 640 260Z"
+          fill="#d8d8d8"
+          stroke="white"
+          strokeWidth="3"
+        />
+
+        {svgSections.map(({ section, shape }) => (
+          <g
+            id={`section-${section.id.toLowerCase()}`}
+            key={section.id}
+            onClick={onCheckout}
+            className="cursor-pointer"
+          >
+            {shape.type === 'path' ? (
+              <path
+                d={shape.d}
+                fill={section.available > 0 ? '#b8df8a' : '#e5e5e5'}
+                stroke="white"
+                strokeWidth="2"
+              />
+            ) : (
+              <rect
+                x={shape.x}
+                y={shape.y}
+                width={shape.width}
+                height={shape.height}
+                rx="4"
+                fill={section.available > 0 ? '#b8df8a' : '#e5e5e5'}
+                stroke="white"
+                strokeWidth="2"
+              />
+            )}
+            {shape.label && (
+              <text
+                x={shape.label.x}
+                y={shape.label.y}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize="18"
+                fontWeight="700"
+                fill="#315315"
+              >
+                {shape.label.text}
+              </text>
+            )}
+          </g>
+        ))}
+
+        <rect x="420" y="310" width="180" height="290" rx="32" fill="#b8df8a" stroke="white" strokeWidth="3" />
+        <rect x="600" y="300" width="225" height="120" rx="8" fill="#b8df8a" stroke="white" strokeWidth="3" />
+        <rect x="600" y="455" width="225" height="145" rx="8" fill="#b8df8a" stroke="white" strokeWidth="3" />
+        <rect x="475" y="430" width="70" height="70" rx="10" fill="#b8df8a" stroke="white" strokeWidth="3" />
+        <text x="510" y="455" textAnchor="middle" fontSize="14" fontWeight="700" fill="#315315">
+          VIP
+        </text>
+        <text x="510" y="470" textAnchor="middle" fontSize="12" fontWeight="700" fill="#315315">
+          1K
+        </text>
+        <text x="505" y="462" textAnchor="middle" fontSize="14" fontWeight="700" fill="#315315" transform="rotate(-90 505 462)">
+          GENERAL ADMISSION
+        </text>
+        <text x="708" y="360" textAnchor="middle" fontSize="16" fontWeight="700" fill="#315315">
+          FRONT ZONE
+        </text>
+        <text x="708" y="380" textAnchor="middle" fontSize="16" fontWeight="700" fill="#315315">
+          STANDING
+        </text>
+        <text x="708" y="520" textAnchor="middle" fontSize="16" fontWeight="700" fill="#315315">
+          FRONT ZONE
+        </text>
+        <text x="708" y="540" textAnchor="middle" fontSize="16" fontWeight="700" fill="#315315">
+          STANDING
+        </text>
+        <rect x="840" y="350" width="60" height="220" fill="#999999" />
+        <text x="875" y="465" textAnchor="middle" fontSize="26" fontWeight="800" fill="white" transform="rotate(90 875 465)">
+          STAGE
+        </text>
+      </svg>
+
+      {badgeSections(sections).map((section) => (
+        <button
+          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-md bg-white px-3 py-1 text-center text-sm font-bold shadow-md"
+          key={section.id}
+          onClick={onCheckout}
+          style={{ left: section.badgeX, top: section.badgeY }}
+        >
+          <div className="text-[10px] font-extrabold text-[#1b6c15]">{section.shortName}</div>
+          <div>{formatPrice(section.price)}</div>
+          <div className="text-xs font-bold text-pink-500">{formatLeft(section.available)}</div>
+        </button>
+      ))}
+    </>
+  );
+}
+
+function buildSvgSections(byId) {
+  const sections = [];
+  const addRect = (id, x, y, width, height, labelText = id) => {
+    if (byId[id]) {
+      sections.push({
+        section: byId[id],
+        shape: { type: 'rect', x, y, width, height, label: { x: x + width / 2, y: y + height / 2, text: labelText } },
+      });
+    }
+  };
+
+  [542, 543, 544, 545, 500, 501, 502, 503].forEach((id, index) =>
+    addRect(String(id), 240 + index * 62, 55 + (index > 5 ? 8 : 0), 62, 82),
+  );
+  [540, 539, 538, 537, 536, 535, 534, 533, 532].forEach((id, index) =>
+    addRect(String(id), 90 + Math.max(index - 3, 0) * 10, 165 + index * 62, 78, 58),
+  );
+  [531, 530, 529, 528, 527, 526, 525, 524, 523, 522, 521, 520].forEach((id, index) =>
+    addRect(String(id), 245 + index * 52, 760 - Math.abs(index - 4) * 5, 54, 60),
+  );
+  [233, 234, 232, 231, 230, 229, 228, 227, 226, 225, 224].forEach((id, index) =>
+    addRect(String(id), 255 - Math.min(index, 6) * 10 + Math.max(index - 6, 0) * 45, 155 + index * 46, 48, 42),
+  );
+  [222, 221, 220, 219, 218, 217, 216].forEach((id, index) =>
+    addRect(String(id), 395 + index * 67, 700 - index * 3, 56, 38),
+  );
+  [143, 142, 141, 140, 139, 138, 137, 134].forEach((id, index) =>
+    addRect(String(id), 310 + Math.max(index - 5, 0) * 42, 255 + index * 51, 54, 45),
+  );
+  [133, 132, 131, 130, 129, 128, 127, 126, 125, 124, 123, 122].forEach((id, index) =>
+    addRect(String(id), 435 + index * 43, 630 - Math.min(index, 5) * 3, 42, 44),
+  );
+  [146, 147, 148, 149, 101, 102, 103, 104, 105].forEach((id, index) =>
+    addRect(String(id), 405 + index * 52, 210 + Math.max(index - 5, 0) * 8, 48, 48),
+  );
+
+  sections.push(
+    { section: byId['GENERAL-ADMISSION'], shape: { type: 'path', d: 'M335 315 L420 310 L420 600 L340 590 C315 510 310 395 335 315Z' } },
+    { section: byId['FRONT-ZONE-NORTH'], shape: { type: 'path', d: 'M545 300 L600 300 L600 420 L545 420Z' } },
+    { section: byId['FRONT-ZONE-SOUTH'], shape: { type: 'path', d: 'M545 455 L600 455 L600 600 L545 600Z' } },
+    { section: byId.VIP, shape: { type: 'path', d: 'M475 430 L545 430 L545 500 L475 500Z' } },
+  );
+
+  return sections.filter(({ section }) => section);
+}
+
+function badgeSections(sections) {
+  const badgePositions = {
+    '542': ['28%', '9%'],
+    '545': ['52%', '8%'],
+    '503': ['84%', '12%'],
+    '538': ['9%', '42%'],
+    '537': ['9%', '53%'],
+    '531': ['31%', '95%'],
+    '520': ['96%', '73%'],
+    '143': ['30%', '36%'],
+    '146': ['45%', '31%'],
+    '101': ['69%', '31%'],
+    '105': ['92%', '39%'],
+    'GENERAL-ADMISSION': ['41%', '56%'],
+    'VIP': ['52%', '55%'],
+    'FRONT-ZONE-NORTH': ['72%', '43%'],
+  };
+
+  return sections
+    .filter((section) => section.available > 0 && badgePositions[section.id])
+    .map((section) => ({
+      ...section,
+      shortName:
+        section.id === 'GENERAL-ADMISSION'
+          ? 'GA'
+          : section.id === 'FRONT-ZONE-NORTH'
+            ? 'FRONT'
+            : section.id,
+      badgeX: badgePositions[section.id][0],
+      badgeY: badgePositions[section.id][1],
+    }));
+}
+
+function formatPrice(price) {
+  return `R${price.toLocaleString('en-ZA')}`;
+}
+
+function formatLeft(available) {
+  if (available >= 1000) return `${Math.round(available / 100) / 10}K left`;
+  return `${available} left`;
 }
 
 function ListingTag({ label }) {
