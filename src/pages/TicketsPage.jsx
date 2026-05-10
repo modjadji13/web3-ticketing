@@ -13,12 +13,37 @@ import {
 } from 'lucide-react';
 import {
   artistImage,
-  fillEverything,
-  mapSectionLabels,
-  showTagsForEverything,
   venueCapacity,
   venueSections,
 } from '../data/ticketData';
+
+const mapPriceTags = [
+  { section: '541', left: '29%', top: '8%', price: 'R1,093', note: '11 left' },
+  { section: '543', left: '43%', top: '5%', price: 'R1,093', note: '8 left' },
+  { section: '500', left: '62%', top: '4%', price: 'R1,093', note: '10 left' },
+  { section: '539', left: '17%', top: '17%', price: 'R1,093' },
+  { section: '538', left: '14%', top: '24%', price: 'R896' },
+  { section: '537', left: '12%', top: '32%', price: 'R772', hot: true },
+  { section: '536', left: '12%', top: '39%', price: 'R675', hot: true },
+  { section: '535', left: '13%', top: '45%', price: 'R690', note: 'Amazing' },
+  { section: '534', left: '12%', top: '52%', price: 'R675', hot: true },
+  { section: '533', left: '13%', top: '59%', price: 'R675', deal: true },
+  { section: '532', left: '13%', top: '66%', price: 'R657', value: true },
+  { section: '531', left: '17%', top: '74%', price: 'R959' },
+  { section: '530', left: '20%', top: '80%', price: 'R1,093', note: '12 left' },
+  { section: '528', left: '32%', top: '91%', price: 'R1,093' },
+  { section: '526', left: '45%', top: '92%', price: 'R1,093', note: '4 left' },
+  { section: '524', left: '58%', top: '91%', price: 'R675' },
+  { section: '231', left: '31%', top: '20%', price: 'R2,519', note: '5 left' },
+  { section: '147', left: '50%', top: '24%', price: 'R2,221' },
+  { section: '225', left: '29%', top: '66%', price: 'R4,882', note: '8 left' },
+  { section: '222', left: '38%', top: '79%', price: 'R2,519', note: '4 left' },
+  { section: '125', left: '65%', top: '75%', price: 'R3,663', note: '2 left' },
+  { section: '217', left: '73%', top: '81%', price: 'R3,350', note: '2 left' },
+  { section: 'VIP', left: '54%', top: '14%', price: 'R8,993', note: '2 left' },
+  { section: 'GA', left: '48%', top: '49%', price: 'R2,321', note: '3 left' },
+  { section: 'FRONT', left: '63%', top: '49%', price: 'R5,466', note: '2 left' },
+];
 
 const ticketListings = [
   {
@@ -148,40 +173,38 @@ function TicketsPage({ onHome, onCheckout }) {
           <div
             className="relative mx-auto"
             style={{
-              width: 'min(760px, calc(100% - 48px), calc((100vh - 152px) * 1.0692))',
+              width: 'min(820px, calc(100% - 48px), calc((100vh - 152px) * 1.07))',
               aspectRatio: '1297 / 1213',
             }}
           >
-            <img
-              alt="FNB Stadium seating map"
-              className={`h-full w-full object-contain ${fillEverything ? 'stadium-map-all-available' : ''}`}
-              src="/maps/fnb-stadium-map.svg"
-            />
+            <StadiumAvailabilityMap />
             <div className="absolute inset-0">
-              {mapSectionLabels
-                .filter((section) => showTagsForEverything || section.featured)
-                .map(({ section, left, top, price, note }) => (
-                  <button
-                    className="tag-box"
-                    key={`${section}-${left}-${top}`}
-                    onClick={onCheckout}
-                    style={{ left, top }}
-                    title={`Section ${section}`}
-                  >
-                    <span className="text-[10px] font-extrabold text-[#1b6c15] leading-none">
-                      {section}
+              {mapPriceTags.map(({ section, left, top, price, note, hot, deal, value }) => (
+                <button
+                  className="tag-box"
+                  key={`${section}-${left}-${top}`}
+                  onClick={onCheckout}
+                  style={{ left, top }}
+                  title={`Section ${section}`}
+                >
+                  <span className="flex items-center gap-1 text-[13px] font-bold text-gray-900 leading-none">
+                    {hot && <Flame size={14} fill="currentColor" className="text-[#e60046]" />}
+                    {deal && <Tag size={14} fill="currentColor" className="text-[#7c3aed]" />}
+                    {value && <span className="text-[#147a38]">$</span>}
+                    {price}
+                  </span>
+                  {note && (
+                    <span
+                      className={`text-[11px] font-extrabold mt-1 mb-0.5 leading-none ${
+                        note === 'Amazing' ? 'text-[#147a38]' : 'text-[#d9147d]'
+                      }`}
+                    >
+                      {note}
                     </span>
-                    <span className="text-[13px] font-bold text-gray-900 leading-none mt-1">
-                      {price}
-                    </span>
-                    {note && (
-                      <span className="text-[11px] text-[#d9147d] font-bold mt-1 mb-0.5 leading-none">
-                        {note}
-                      </span>
-                    )}
-                    <span className="tag-arrow" />
-                  </button>
-                ))}
+                  )}
+                  <span className="tag-arrow" />
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -249,6 +272,18 @@ function TicketsPage({ onHome, onCheckout }) {
         </aside>
       </section>
     </main>
+  );
+}
+
+function StadiumAvailabilityMap() {
+  return (
+    <div className="absolute inset-0">
+      <img
+        alt="FNB Stadium map"
+        className="h-full w-full select-none object-contain pointer-events-none"
+        src="/maps/fnb-stadium-map.svg"
+      />
+    </div>
   );
 }
 
