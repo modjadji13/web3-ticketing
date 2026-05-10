@@ -148,7 +148,7 @@ function TicketsPage({ onHome, onCheckout }) {
             <img
               alt="FNB Stadium seating map"
               className="h-full w-full object-contain"
-              src="/fnb-stadium-map.svg"
+              src="/maps/fnb-stadium-map.svg"
             />
             <div className="absolute inset-0">
               {mapSectionLabels.map(({ section, left, top, price, note }) => (
