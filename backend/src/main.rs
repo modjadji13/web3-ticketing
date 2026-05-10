@@ -547,49 +547,117 @@ fn seed_demo_event(state: &AppState) {
 }
 
 fn generate_jcole_seats() -> HashMap<String, Seat> {
-    // The React mockup shows section-style labels instead of a simple grid. These
-    // IDs let the static-looking UI reserve real backend seats.
-    let seat_specs = [
-        ("538-G", "G", 538),
-        ("531-X", "X", 531),
-        ("545-ROW", "ROW", 545),
-        ("535-ROW", "ROW", 535),
-        ("536-ROW", "ROW", 536),
-        ("524", "524", 1),
-        ("525", "525", 1),
-        ("526", "526", 1),
-        ("527", "527", 1),
-        ("528", "528", 1),
-        ("529", "529", 1),
-        ("530", "530", 1),
-        ("532", "532", 1),
-        ("533", "533", 1),
-        ("534", "534", 1),
-        ("537", "537", 1),
-        ("539", "539", 1),
-        ("540", "540", 1),
-        ("541", "541", 1),
-        ("542", "542", 1),
-        ("543", "543", 1),
-        ("544", "544", 1),
-    ];
+    // FNB Stadium is treated as a 90,000-capacity concert venue for the demo.
+    // The capacities below are practical allocations by visible map area:
+    // standing field zones, VIP, lower bowl, 200-level, and 500-level sections.
+    let mut seats = HashMap::new();
 
-    seat_specs
-        .into_iter()
-        .map(|(id, row, number)| {
-            (
-                id.to_string(),
+    let sections = fnb_stadium_sections();
+    let total_capacity: u32 = sections.iter().map(|section| section.capacity).sum();
+    assert_eq!(total_capacity, 90_000, "FNB demo inventory must equal 90,000 seats");
+
+    for section in sections {
+        for index in 1..=section.capacity {
+            let (id, row, number) = section_alias(section.id, index).unwrap_or_else(|| {
+                (
+                    format!("{}-{index}", section.id),
+                    section.id.to_string(),
+                    index as u16,
+                )
+            });
+
+            seats.insert(
+                id.clone(),
                 Seat {
-                    id: id.to_string(),
-                    row: row.to_string(),
+                    id,
+                    row,
                     number,
                     status: SeatStatus::Available,
                     hold: None,
                     ticket_id: None,
                 },
-            )
-        })
-        .collect()
+            );
+        }
+    }
+
+    seats
+}
+
+struct VenueSection {
+    id: &'static str,
+    capacity: u32,
+}
+
+fn fnb_stadium_sections() -> Vec<VenueSection> {
+    let mut sections = vec![
+        VenueSection {
+            id: "GENERAL-ADMISSION",
+            capacity: 18_500,
+        },
+        VenueSection {
+            id: "FRONT-ZONE-NORTH",
+            capacity: 12_000,
+        },
+        VenueSection {
+            id: "FRONT-ZONE-SOUTH",
+            capacity: 12_000,
+        },
+        VenueSection {
+            id: "VIP",
+            capacity: 1_000,
+        },
+    ];
+
+    for id in [101, 102, 103, 104, 105] {
+        sections.push(VenueSection {
+            id: Box::leak(id.to_string().into_boxed_str()),
+            capacity: 650,
+        });
+    }
+
+    for id in 122..=149 {
+        sections.push(VenueSection {
+            id: Box::leak(id.to_string().into_boxed_str()),
+            capacity: 650,
+        });
+    }
+
+    for id in 216..=234 {
+        sections.push(VenueSection {
+            id: Box::leak(id.to_string().into_boxed_str()),
+            capacity: 450,
+        });
+    }
+
+    for id in 500..=503 {
+        sections.push(VenueSection {
+            id: Box::leak(id.to_string().into_boxed_str()),
+            capacity: 550,
+        });
+    }
+
+    for id in 520..=545 {
+        sections.push(VenueSection {
+            id: Box::leak(id.to_string().into_boxed_str()),
+            capacity: 550,
+        });
+    }
+
+    sections
+}
+
+fn section_alias(section_id: &str, index: u32) -> Option<(String, String, u16)> {
+    // Preserve the seat IDs already used by the frontend checkout and listings.
+    let alias = match (section_id, index) {
+        ("538", 1) => Some(("538-G", "G", 538)),
+        ("531", 1) => Some(("531-X", "X", 531)),
+        ("545", 1) => Some(("545-ROW", "ROW", 545)),
+        ("535", 1) => Some(("535-ROW", "ROW", 535)),
+        ("536", 1) => Some(("536-ROW", "ROW", 536)),
+        _ => None,
+    }?;
+
+    Some((alias.0.to_string(), alias.1.to_string(), alias.2))
 }
 
 fn generate_seats(rows: u16, seats_per_row: u16) -> HashMap<String, Seat> {

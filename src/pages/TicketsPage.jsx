@@ -11,7 +11,7 @@ import {
   Ticket,
   UserCircle,
 } from 'lucide-react';
-import { artistImage, priceTags } from '../data/ticketData';
+import { artistImage, mapSectionLabels, venueCapacity, venueSections } from '../data/ticketData';
 
 const ticketListings = [
   {
@@ -19,6 +19,7 @@ const ticketListings = [
     row: 'G',
     price: 'R935',
     ticket: '1 ticket',
+    capacity: 550,
     tags: ['Best price', 'Viewed'],
   },
   {
@@ -26,6 +27,7 @@ const ticketListings = [
     row: 'X',
     price: 'R959',
     ticket: '1 ticket',
+    capacity: 550,
     tags: [],
   },
   {
@@ -33,6 +35,7 @@ const ticketListings = [
     row: 'ROW',
     price: 'R1,093',
     ticket: '1 ticket',
+    capacity: 550,
     aisle: true,
     tags: ['Best deal', '2 tickets remaining in this listing', 'Last tickets'],
   },
@@ -41,6 +44,7 @@ const ticketListings = [
     row: 'ROW',
     price: 'R1,093',
     ticket: '1 ticket',
+    capacity: 550,
     aisle: true,
     tags: [],
   },
@@ -49,8 +53,25 @@ const ticketListings = [
     row: 'ROW',
     price: 'R1,093',
     ticket: '1 ticket',
+    capacity: 550,
     aisle: true,
     tags: [],
+  },
+  {
+    section: 'GENERAL-ADMISSION',
+    row: 'Standing',
+    price: 'R1,250',
+    ticket: '18,500 tickets',
+    capacity: 18500,
+    tags: ['Best deal'],
+  },
+  {
+    section: 'FRONT-ZONE-NORTH',
+    row: 'Standing',
+    price: 'R3,674',
+    ticket: '12,000 tickets',
+    capacity: 12000,
+    tags: ['Last tickets'],
   },
 ];
 
@@ -130,19 +151,23 @@ function TicketsPage({ onHome, onCheckout }) {
               src="/fnb-stadium-map.png"
             />
             <div className="absolute inset-0">
-              {priceTags.map(([left, top, price, leftText]) => (
+              {mapSectionLabels.map(({ section, left, top, price, note }) => (
                 <button
                   className="tag-box"
-                  key={`${left}-${top}-${price}`}
+                  key={`${section}-${left}-${top}`}
                   onClick={onCheckout}
                   style={{ left, top }}
+                  title={`Section ${section}`}
                 >
+                  <span className="text-[10px] font-extrabold text-[#1b6c15] leading-none">
+                    {section}
+                  </span>
                   <span className="text-[13px] font-bold text-gray-900 leading-none mt-1">
                     {price}
                   </span>
-                  {leftText && (
+                  {note && (
                     <span className="text-[11px] text-[#d9147d] font-bold mt-1 mb-0.5 leading-none">
-                      {leftText}
+                      {note}
                     </span>
                   )}
                   <span className="tag-arrow" />
@@ -154,7 +179,12 @@ function TicketsPage({ onHome, onCheckout }) {
 
         <aside className="bg-white border-l border-slate-200 h-full overflow-y-auto">
           <div className="sticky top-0 bg-white z-10 border-b border-slate-200 h-[52px] px-5 flex items-center justify-between">
-            <h2 className="font-extrabold text-[18px]">54 listings</h2>
+            <div>
+              <h2 className="font-extrabold text-[18px]">{venueSections.length} sections</h2>
+              <p className="text-[12px] font-semibold text-slate-500">
+                {venueCapacity.toLocaleString()} seat venue inventory
+              </p>
+            </div>
 
             <div className="flex items-center gap-3">
               <button className="w-10 h-10 rounded-lg border border-slate-300 flex items-center justify-center">
@@ -178,6 +208,9 @@ function TicketsPage({ onHome, onCheckout }) {
                   <h3 className="text-[17px] font-extrabold">Section {item.section}</h3>
                   <p className="mt-2 text-[14px] font-extrabold">Row {item.row}</p>
                   <p className="mt-2 text-[15px]">{item.ticket}</p>
+                  <p className="mt-1 text-[13px] text-slate-500">
+                    Section capacity {item.capacity.toLocaleString()}
+                  </p>
 
                   {item.aisle && (
                     <div className="mt-1 flex items-center gap-2 text-[14px] text-slate-600">
