@@ -141,8 +141,8 @@ function TicketsPage({ onHome, onCheckout }) {
           <div
             className="relative mx-auto"
             style={{
-              width: 'min(760px, calc(100% - 48px), calc((100vh - 152px) * 1.1203))',
-              aspectRatio: '652 / 582',
+              width: 'min(760px, calc(100% - 48px), calc((100vh - 152px) * 1.0692))',
+              aspectRatio: '1297 / 1213',
             }}
           >
             <img
