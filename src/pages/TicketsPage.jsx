@@ -11,7 +11,7 @@ import {
   Ticket,
   UserCircle,
 } from 'lucide-react';
-import { artistImage } from '../data/ticketData';
+import { artistImage, priceTags } from '../data/ticketData';
 
 const ticketListings = [
   {
@@ -117,12 +117,38 @@ function TicketsPage({ onHome, onCheckout }) {
             </button>
           </div>
 
-          <div className="relative w-[930px] h-[790px] mx-auto -mt-1">
+          <div
+            className="relative mx-auto"
+            style={{
+              width: 'min(760px, calc(100% - 48px))',
+              height: 'min(660px, calc(100% - 32px))',
+            }}
+          >
             <img
               alt="FNB Stadium seating map"
               className="h-full w-full object-contain"
               src="/fnb-stadium-map.png"
             />
+            <div className="absolute inset-0">
+              {priceTags.map(([left, top, price, leftText]) => (
+                <button
+                  className="tag-box"
+                  key={`${left}-${top}-${price}`}
+                  onClick={onCheckout}
+                  style={{ left, top }}
+                >
+                  <span className="text-[13px] font-bold text-gray-900 leading-none mt-1">
+                    {price}
+                  </span>
+                  {leftText && (
+                    <span className="text-[11px] text-[#d9147d] font-bold mt-1 mb-0.5 leading-none">
+                      {leftText}
+                    </span>
+                  )}
+                  <span className="tag-arrow" />
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
