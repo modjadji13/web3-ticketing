@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   clusterApiUrl,
   Connection,
@@ -12,6 +12,8 @@ const PROGRAM_ID = new PublicKey('35wzuQvuh6PkqoTe8sgZu8hx8cV4sG2G8h89zELaLmKD')
 const INITIALIZE_EVENT_DISCRIMINATOR = Uint8Array.from([126, 249, 86, 221, 202, 171, 134, 20]);
 const RESERVE_SEAT_DISCRIMINATOR = Uint8Array.from([42, 147, 222, 136, 162, 134, 183, 168]);
 const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+const API_URL = 'http://127.0.0.1:8090';
+const SELECTED_SEAT_ID = '538-G';
 
 const ticketEvent = {
   name: 'J. Cole',
@@ -31,7 +33,7 @@ const eventCards = [
     day: '12',
     dow: 'Sat',
     title: 'J. Cole',
-    details: '6:00 PM • 🇿🇦 Johannesburg, Gauteng, South Africa · FNB Stadium',
+    details: '6:00 PM - Johannesburg, Gauteng, South Africa - FNB Stadium',
     badge: 'Hottest event',
     badgeClass: 'bg-[#e7f5e8] text-[#147a38]',
   },
@@ -40,14 +42,14 @@ const eventCards = [
     day: '10',
     dow: 'Fri',
     title: 'J. Cole',
-    details: '8:00 PM • 🇺🇸 Charlotte, NC, US · Spectrum Center',
+    details: '8:00 PM - Charlotte, NC, US - Spectrum Center',
   },
   {
     month: 'Jul',
     day: '11',
     dow: 'Sat',
     title: 'J. Cole',
-    details: '8:00 PM • 🇺🇸 Charlotte, NC, US · Spectrum Center',
+    details: '8:00 PM - Charlotte, NC, US - Spectrum Center',
     badge: 'Selling fast',
     badgeClass: 'bg-[#fef1f2] text-[#e11d48]',
   },
@@ -56,7 +58,7 @@ const eventCards = [
     day: '14',
     dow: 'Tue',
     title: 'J. Cole',
-    details: '8:00 PM • 🇺🇸 Miami, FL, US · Kaseya Center',
+    details: '8:00 PM - Miami, FL, US - Kaseya Center',
     badge: 'Best value',
     badgeClass: 'bg-[#e7f5e8] text-[#147a38]',
   },
@@ -102,13 +104,25 @@ function App() {
   const [page, setPage] = useState('home');
   const [status, setStatus] = useState('');
   const [isBuying, setIsBuying] = useState(false);
+  const [backendEvent, setBackendEvent] = useState(null);
+  const [ticket, setTicket] = useState(null);
+
+  useEffect(() => {
+    ensureBackendEvent().then(setBackendEvent).catch((error) => setStatus(error.message));
+  }, []);
 
   async function buyOnDevnet() {
     setIsBuying(true);
     setStatus('');
     try {
+      const event = backendEvent || (await ensureBackendEvent());
+      setBackendEvent(event);
       const result = await reserveStaticTicketOnChain();
-      setStatus(`Reserved on Solana devnet: ${shortAddress(result.signature)}`);
+      const reservation = await reserveSeatInBackend(event, result);
+      setTicket(reservation.ticket);
+      setStatus(
+        `Reserved in backend and on Solana devnet: ${shortAddress(result.signature)} - ticket ${shortAddress(reservation.ticket.id)}`,
+      );
     } catch (error) {
       setStatus(error.message);
     } finally {
@@ -131,6 +145,7 @@ function App() {
           onCheckout={() => setPage('checkout')}
           onBuy={buyOnDevnet}
           status={status}
+          ticket={ticket}
         />
       )}
     </div>
@@ -388,8 +403,8 @@ function EventFlowHeader({ onBack }) {
           <div className="flex flex-col">
             <h2 className="font-bold text-[16px] leading-tight text-gray-900">J. Cole</h2>
             <div className="text-[13.5px] text-gray-600 flex items-center gap-1.5 mt-0.5">
-              <span>Sat • Dec 12 • 6:00 PM</span>
-              <span className="text-gray-300">•</span>
+              <span>Sat - Dec 12 - 6:00 PM</span>
+              <span className="text-gray-300">-</span>
               <span className="truncate max-w-[200px] md:max-w-none">
                 FNB Stadium, Johannesburg, Gauteng, South Africa
               </span>
@@ -585,7 +600,7 @@ function CheckoutPage({ onTickets, onFinal }) {
               </div>
             </div>
             <div className="mt-8">
-              <h1 className="text-[22px] font-bold text-gray-900 leading-tight">Section 538 · Row G</h1>
+              <h1 className="text-[22px] font-bold text-gray-900 leading-tight">Section 538 - Row G</h1>
               <p className="text-[15px] text-gray-500 mt-1">1 ticket</p>
               <div className="flex flex-wrap items-center gap-3 mt-4">
                 <Badge tone="danger">High demand</Badge>
@@ -620,7 +635,7 @@ function CheckoutHeader({ onBack, timer }) {
             <h2 className="font-bold text-[16px] leading-tight text-[#0f5424] hover:underline cursor-pointer" onClick={onBack}>
               J. Cole
             </h2>
-            <div className="text-[13.5px] text-gray-900 font-medium mt-0.5">Sat • 12 Dec • 18:00</div>
+            <div className="text-[13.5px] text-gray-900 font-medium mt-0.5">Sat - 12 Dec - 18:00</div>
             <div className="text-[13px] text-[#0f5424] hover:underline cursor-pointer mt-0.5">
               FNB Stadium, Johannesburg, Gauteng, South Africa
             </div>
@@ -655,7 +670,7 @@ function OrderSummary({ onFinal }) {
           <h2 className="text-[20px] font-bold text-gray-900 mb-5">Order summary</h2>
           <div className="flex justify-between items-center mb-1">
             <span className="text-[15px] text-gray-800">Ticket price</span>
-            <span className="text-[15px] font-medium text-gray-900">1 × R935</span>
+            <span className="text-[15px] font-medium text-gray-900">1 x R935</span>
           </div>
           <p className="text-[13px] text-gray-500 mb-6">
             Tax, handling fee, and booking fee not included
@@ -678,7 +693,7 @@ function OrderSummary({ onFinal }) {
   );
 }
 
-function FinalCheckoutPage({ isBuying, onCheckout, onBuy, status }) {
+function FinalCheckoutPage({ isBuying, onCheckout, onBuy, status, ticket }) {
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <CheckoutHeader onBack={onCheckout} timer="05:45" />
@@ -716,6 +731,11 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, status }) {
                 </button>
               </div>
               {status && <p className="text-[14px] text-[#0a58ca] mb-6">{status}</p>}
+              {ticket && (
+                <p className="text-[13px] text-gray-500 mb-6">
+                  Backend ticket: {ticket.id} / seat {ticket.seat_id}
+                </p>
+              )}
               <p className="text-[14px] text-gray-500 leading-relaxed max-w-[550px]">
                 By signing in or creating an account, you agree to our{' '}
                 <a className="text-[#0a58ca] hover:underline" href="#">
@@ -752,9 +772,9 @@ function FinalOrderCard() {
           <div className="flex justify-between items-start gap-4 mt-4">
             <div>
               <h3 className="font-bold text-[16px] text-gray-900 mb-0.5">J. Cole</h3>
-              <p className="text-[14px] text-gray-600 mb-0.5">Sat 12 Dec • 18:00</p>
+              <p className="text-[14px] text-gray-600 mb-0.5">Sat 12 Dec - 18:00</p>
               <p className="text-[14px] text-gray-600 leading-snug">
-                FNB Stadium • Johannesburg, Gauteng, South Africa
+                FNB Stadium - Johannesburg, Gauteng, South Africa
               </p>
             </div>
             <img alt="J. Cole" className="w-[60px] h-[60px] rounded-lg object-cover shadow-sm shrink-0" src={artistImage} />
@@ -762,7 +782,7 @@ function FinalOrderCard() {
           <div className="my-5 border-t border-gray-100" />
           <div className="flex justify-between items-center">
             <div>
-              <h3 className="font-bold text-[16px] text-gray-900 mb-0.5">Section 538 • Row G</h3>
+              <h3 className="font-bold text-[16px] text-gray-900 mb-0.5">Section 538 - Row G</h3>
               <p className="text-[14px] text-gray-600">1 ticket</p>
             </div>
             <button className="border border-gray-300 rounded-md px-4 py-1.5 text-[14px] font-medium text-gray-700 hover:bg-gray-50 transition-colors">
@@ -772,7 +792,7 @@ function FinalOrderCard() {
           <div className="my-5 border-t border-gray-100" />
           <div className="flex justify-between items-center mb-1">
             <span className="text-[14px] text-gray-800">Ticket price</span>
-            <span className="text-[14px] font-medium text-gray-900">1 × R935</span>
+            <span className="text-[14px] font-medium text-gray-900">1 x R935</span>
           </div>
           <p className="text-[12px] text-gray-500">Tax, handling fee, and booking fee not included</p>
         </div>
@@ -835,6 +855,55 @@ function Footer() {
   );
 }
 
+async function apiRequest(path, options) {
+  const response = await fetch(`${API_URL}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Backend request failed');
+  }
+  return data;
+}
+
+async function ensureBackendEvent() {
+  const events = await apiRequest('/api/events');
+  const existing = events.find(
+    (event) => event.name === ticketEvent.name && event.venue === ticketEvent.venue,
+  );
+  if (existing) {
+    return existing;
+  }
+
+  return apiRequest('/api/events', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: ticketEvent.name,
+      venue: ticketEvent.venue,
+      chain: 'solana-devnet',
+      price_lamports: ticketEvent.price_lamports,
+      per_wallet_limit: ticketEvent.per_wallet_limit,
+      resale_cap_bps: ticketEvent.resale_cap_bps,
+      royalty_bps: ticketEvent.royalty_bps,
+      rows: 1,
+      seats_per_row: 1,
+    }),
+  });
+}
+
+async function reserveSeatInBackend(event, chainResult) {
+  return apiRequest(`/api/events/${event.id}/seats/${SELECTED_SEAT_ID}/reserve`, {
+    method: 'POST',
+    body: JSON.stringify({
+      wallet_address: chainResult.owner,
+      payment_signature: chainResult.signature,
+      onchain_ticket_address: chainResult.ticketPda,
+      metadata_uri: `ipfs://j-cole-${SELECTED_SEAT_ID}`,
+    }),
+  });
+}
+
 async function reserveStaticTicketOnChain() {
   const provider = window.solana?.isPhantom ? window.solana : null;
   if (!provider) {
@@ -848,7 +917,7 @@ async function reserveStaticTicketOnChain() {
     PROGRAM_ID,
   );
   const [ticketPda] = PublicKey.findProgramAddressSync(
-    [textBytes('ticket'), eventPda.toBuffer(), textBytes('538-G')],
+    [textBytes('ticket'), eventPda.toBuffer(), textBytes(SELECTED_SEAT_ID)],
     PROGRAM_ID,
   );
 
@@ -886,7 +955,7 @@ async function reserveStaticTicketOnChain() {
         { pubkey: ticketPda, isSigner: false, isWritable: true },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
-      data: concatBytes(RESERVE_SEAT_DISCRIMINATOR, encodeString('538-G')),
+      data: concatBytes(RESERVE_SEAT_DISCRIMINATOR, encodeString(SELECTED_SEAT_ID)),
     }),
   );
 
@@ -896,7 +965,12 @@ async function reserveStaticTicketOnChain() {
   const result = await provider.signAndSendTransaction(transaction);
   const signature = typeof result === 'string' ? result : result.signature;
   await connection.confirmTransaction({ signature, ...latestBlockhash }, 'confirmed');
-  return { signature, eventPda: eventPda.toString(), ticketPda: ticketPda.toString() };
+  return {
+    signature,
+    eventPda: eventPda.toString(),
+    ticketPda: ticketPda.toString(),
+    owner: buyer.toString(),
+  };
 }
 
 function textBytes(value) {

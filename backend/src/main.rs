@@ -207,7 +207,7 @@ async fn main() {
         store: Arc::new(RwLock::new(Store::default())),
     };
 
-    // Add one event so the frontend/API has data immediately after startup.
+    // Add the demo event used by the React ticketing flow.
     seed_demo_event(&state);
 
     // HTTP API routes that mirror the architecture: events, seats, holds,
@@ -280,10 +280,14 @@ async fn create_event(
         created_at: Utc::now(),
     };
 
-    let seats = generate_seats(
-        payload.rows.unwrap_or(8),
-        payload.seats_per_row.unwrap_or(12),
-    );
+    let seats = if event.name == "J. Cole" {
+        generate_jcole_seats()
+    } else {
+        generate_seats(
+            payload.rows.unwrap_or(8),
+            payload.seats_per_row.unwrap_or(12),
+        )
+    };
 
     // Store seats separately from event metadata so seat state can update often.
     store.seats.insert(event.id, seats);
@@ -527,19 +531,65 @@ fn seed_demo_event(state: &AppState) {
     let mut store = state.store.write().expect("seed store lock");
     let event = Event {
         id: Uuid::new_v4(),
-        name: "Chainwave Summit".into(),
-        venue: "Cape Town ICC".into(),
+        name: "J. Cole".into(),
+        venue: "FNB Stadium, Johannesburg, Gauteng, South Africa".into(),
         chain: "solana-devnet".into(),
-        price_lamports: 32_000_000,
+        price_lamports: 935_000_000,
         sale_start: Utc::now(),
-        per_wallet_limit: 4,
-        resale_cap_bps: 12_000,
+        per_wallet_limit: 2,
+        resale_cap_bps: 1_200,
         royalty_bps: 500,
         created_at: Utc::now(),
     };
 
-    store.seats.insert(event.id, generate_seats(10, 16));
+    store.seats.insert(event.id, generate_jcole_seats());
     store.events.insert(event.id, event);
+}
+
+fn generate_jcole_seats() -> HashMap<String, Seat> {
+    // The React mockup shows section-style labels instead of a simple grid. These
+    // IDs let the static-looking UI reserve real backend seats.
+    let seat_specs = [
+        ("538-G", "G", 538),
+        ("531-X", "X", 531),
+        ("545-ROW", "ROW", 545),
+        ("535-ROW", "ROW", 535),
+        ("536-ROW", "ROW", 536),
+        ("524", "524", 1),
+        ("525", "525", 1),
+        ("526", "526", 1),
+        ("527", "527", 1),
+        ("528", "528", 1),
+        ("529", "529", 1),
+        ("530", "530", 1),
+        ("532", "532", 1),
+        ("533", "533", 1),
+        ("534", "534", 1),
+        ("537", "537", 1),
+        ("539", "539", 1),
+        ("540", "540", 1),
+        ("541", "541", 1),
+        ("542", "542", 1),
+        ("543", "543", 1),
+        ("544", "544", 1),
+    ];
+
+    seat_specs
+        .into_iter()
+        .map(|(id, row, number)| {
+            (
+                id.to_string(),
+                Seat {
+                    id: id.to_string(),
+                    row: row.to_string(),
+                    number,
+                    status: SeatStatus::Available,
+                    hold: None,
+                    ticket_id: None,
+                },
+            )
+        })
+        .collect()
 }
 
 fn generate_seats(rows: u16, seats_per_row: u16) -> HashMap<String, Seat> {
