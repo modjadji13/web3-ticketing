@@ -11,7 +11,14 @@ import {
   Ticket,
   UserCircle,
 } from 'lucide-react';
-import { artistImage, mapSectionLabels, venueCapacity, venueSections } from '../data/ticketData';
+import {
+  artistImage,
+  fillEverything,
+  mapSectionLabels,
+  showTagsForEverything,
+  venueCapacity,
+  venueSections,
+} from '../data/ticketData';
 
 const ticketListings = [
   {
@@ -147,32 +154,34 @@ function TicketsPage({ onHome, onCheckout }) {
           >
             <img
               alt="FNB Stadium seating map"
-              className="h-full w-full object-contain"
+              className={`h-full w-full object-contain ${fillEverything ? 'stadium-map-all-available' : ''}`}
               src="/maps/fnb-stadium-map.svg"
             />
             <div className="absolute inset-0">
-              {mapSectionLabels.map(({ section, left, top, price, note }) => (
-                <button
-                  className="tag-box"
-                  key={`${section}-${left}-${top}`}
-                  onClick={onCheckout}
-                  style={{ left, top }}
-                  title={`Section ${section}`}
-                >
-                  <span className="text-[10px] font-extrabold text-[#1b6c15] leading-none">
-                    {section}
-                  </span>
-                  <span className="text-[13px] font-bold text-gray-900 leading-none mt-1">
-                    {price}
-                  </span>
-                  {note && (
-                    <span className="text-[11px] text-[#d9147d] font-bold mt-1 mb-0.5 leading-none">
-                      {note}
+              {mapSectionLabels
+                .filter((section) => showTagsForEverything || section.featured)
+                .map(({ section, left, top, price, note }) => (
+                  <button
+                    className="tag-box"
+                    key={`${section}-${left}-${top}`}
+                    onClick={onCheckout}
+                    style={{ left, top }}
+                    title={`Section ${section}`}
+                  >
+                    <span className="text-[10px] font-extrabold text-[#1b6c15] leading-none">
+                      {section}
                     </span>
-                  )}
-                  <span className="tag-arrow" />
-                </button>
-              ))}
+                    <span className="text-[13px] font-bold text-gray-900 leading-none mt-1">
+                      {price}
+                    </span>
+                    {note && (
+                      <span className="text-[11px] text-[#d9147d] font-bold mt-1 mb-0.5 leading-none">
+                        {note}
+                      </span>
+                    )}
+                    <span className="tag-arrow" />
+                  </button>
+                ))}
             </div>
           </div>
         </div>

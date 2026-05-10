@@ -59,6 +59,11 @@ export const listings = [
 
 export const venueCapacity = 90000;
 
+export const AVAILABLE_GREEN = '#b8df8a';
+export const UNAVAILABLE_GREY = '#e5e5e5';
+export const fillEverything = true;
+export const showTagsForEverything = false;
+
 export const venueSections = [
   { id: 'GENERAL-ADMISSION', name: 'General Admission', tier: 'standing', capacity: 18500 },
   { id: 'FRONT-ZONE-NORTH', name: 'Front Zone Standing', tier: 'standing', capacity: 12000 },
@@ -82,21 +87,21 @@ export const mapSectionLabels = [
   { section: '542', left: '28%', top: '10%', price: 'R1,093' },
   { section: '543', left: '36%', top: '9%', price: 'R1,093' },
   { section: '544', left: '44%', top: '9%', price: 'R1,093' },
-  { section: '545', left: '52%', top: '9%', price: 'R1,093', note: '2 left' },
+  { section: '545', left: '52%', top: '9%', price: 'R1,093', note: '2 left', featured: true },
   { section: '500', left: '59%', top: '9%', price: 'R1,093' },
   { section: '501', left: '67%', top: '9%', price: 'R1,093' },
   { section: '502', left: '75%', top: '10%', price: 'R1,093' },
   { section: '503', left: '84%', top: '13%', price: 'R1,093' },
   { section: '540', left: '15%', top: '22%', price: 'R1,093' },
   { section: '539', left: '11%', top: '32%', price: 'R1,093' },
-  { section: '538', left: '9%', top: '43%', price: 'R935', note: 'Best' },
+  { section: '538', left: '9%', top: '43%', price: 'R935', note: 'Best', featured: true },
   { section: '537', left: '9%', top: '54%', price: 'R1,093' },
   { section: '536', left: '9%', top: '65%', price: 'R1,093' },
   { section: '535', left: '10%', top: '75%', price: 'R1,093' },
   { section: '534', left: '13%', top: '85%', price: 'R1,093' },
   { section: '533', left: '18%', top: '91%', price: 'R1,093' },
   { section: '532', left: '24%', top: '94%', price: 'R1,093' },
-  { section: '531', left: '31%', top: '95%', price: 'R959' },
+  { section: '531', left: '31%', top: '95%', price: 'R959', featured: true },
   { section: '530', left: '39%', top: '94%', price: 'R1,093' },
   { section: '529', left: '47%', top: '93%', price: 'R1,093' },
   { section: '528', left: '55%', top: '92%', price: 'R1,093' },
@@ -151,9 +156,9 @@ export const mapSectionLabels = [
   { section: '103', left: '81%', top: '35%', price: 'R3,904' },
   { section: '104', left: '87%', top: '37%', price: 'R3,904' },
   { section: '105', left: '92%', top: '40%', price: 'R3,904' },
-  { section: 'GA', left: '41%', top: '57%', price: 'R1,250', note: '18.5K' },
-  { section: 'VIP', left: '50%', top: '56%', price: 'R8,993', note: '1K' },
-  { section: 'FRONT', left: '71%', top: '54%', price: 'R3,674', note: '24K' },
+  { section: 'GA', left: '41%', top: '57%', price: 'R1,250', note: '18.5K', featured: true },
+  { section: 'VIP', left: '50%', top: '56%', price: 'R8,993', note: '1K', featured: true },
+  { section: 'FRONT', left: '71%', top: '54%', price: 'R3,674', note: '24K', featured: true },
 ];
 
 export const priceTags = [

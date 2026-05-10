@@ -36,6 +36,10 @@ svg {
   display: block;
 }
 
+.stadium-map-all-available {
+  filter: hue-rotate(-130deg) saturate(0.85) brightness(1.08);
+}
+
 .tag-box {
   position: absolute;
   z-index: 10;
