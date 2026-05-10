@@ -1,8 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import { clusterApiUrl, Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
+import {
+  clusterApiUrl,
+  Connection,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+  TransactionInstruction,
+} from '@solana/web3.js';
 
 const API_URL = 'http://127.0.0.1:8090';
 const SOLANA_RPC_URL = clusterApiUrl('devnet');
+const PROGRAM_ID = new PublicKey('35wzuQvuh6PkqoTe8sgZu8hx8cV4sG2G8h89zELaLmKD');
+const INITIALIZE_EVENT_DISCRIMINATOR = Uint8Array.from([126, 249, 86, 221, 202, 171, 134, 20]);
+const RESERVE_SEAT_DISCRIMINATOR = Uint8Array.from([42, 147, 222, 136, 162, 134, 183, 168]);
 const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
 
 function App() {
@@ -15,6 +26,7 @@ function App() {
   const [walletProvider, setWalletProvider] = useState(null);
   const [solBalance, setSolBalance] = useState(null);
   const [ticket, setTicket] = useState(null);
+  const [onChainTicket, setOnChainTicket] = useState(null);
   const [verifyForm, setVerifyForm] = useState({
     eventId: '',
     seatId: '',
@@ -73,20 +85,6 @@ function App() {
     const publicKey = new PublicKey(address);
     const balance = await connection.getBalance(publicKey);
     setSolBalance(balance / LAMPORTS_PER_SOL);
-  }
-
-  async function signCheckoutMessage() {
-    if (!walletProvider?.signMessage) {
-      return `unsigned-${Date.now()}`;
-    }
-
-    const message = new TextEncoder().encode(
-      `Reserve ${selectedEvent.name} seat ${selectedSeat.id} on Solana devnet`,
-    );
-    const signed = await walletProvider.signMessage(message, 'utf8');
-    return Array.from(signed.signature)
-      .map((byte) => byte.toString(16).padStart(2, '0'))
-      .join('');
   }
 
   async function loadEvents() {
@@ -150,31 +148,99 @@ function App() {
     setLoading(true);
     setMessage('');
     try {
-      const signature = await signCheckoutMessage();
+      const onChainReservation = await reserveSeatOnChain();
       const result = await request(
         `/api/events/${selectedEvent.id}/seats/${selectedSeat.id}/reserve`,
         {
           method: 'POST',
           body: JSON.stringify({
-            wallet_address: wallet,
-            payment_signature: signature,
+            wallet_address: onChainReservation.owner,
+            payment_signature: onChainReservation.signature,
+            onchain_ticket_address: onChainReservation.ticketPda,
             metadata_uri: `ipfs://ticket-${selectedEvent.id}-${selectedSeat.id}`,
           }),
         },
       );
       setTicket(result.ticket);
+      setOnChainTicket(onChainReservation);
       setVerifyForm({
         eventId: result.ticket.event_id,
         seatId: result.ticket.seat_id,
         walletAddress: result.ticket.owner_wallet,
       });
-      setMessage(`Ticket reserved: ${result.ticket.id}`);
+      setMessage(`Ticket reserved on devnet: ${shortAddress(onChainReservation.signature)}`);
       setPage('verify');
     } catch (error) {
       setMessage(error.message);
     } finally {
       setLoading(false);
     }
+  }
+
+  async function reserveSeatOnChain() {
+    if (!walletProvider?.publicKey) {
+      throw new Error('Connect Phantom before sending a Solana transaction.');
+    }
+
+    const buyer = walletProvider.publicKey;
+    const [eventPda] = PublicKey.findProgramAddressSync(
+      [textBytes('event'), buyer.toBuffer(), textBytes(selectedEvent.name)],
+      PROGRAM_ID,
+    );
+    const [ticketPda] = PublicKey.findProgramAddressSync(
+      [textBytes('ticket'), eventPda.toBuffer(), textBytes(selectedSeat.id)],
+      PROGRAM_ID,
+    );
+
+    const ticketAccount = await connection.getAccountInfo(ticketPda);
+    if (ticketAccount) {
+      throw new Error('This seat already has an on-chain ticket for your event account.');
+    }
+
+    const transaction = new Transaction();
+    const eventAccount = await connection.getAccountInfo(eventPda);
+    if (!eventAccount) {
+      transaction.add(
+        buildInitializeEventInstruction({
+          organizer: buyer,
+          eventPda,
+          event: selectedEvent,
+          totalSeats: seats.length,
+        }),
+      );
+    }
+
+    transaction.add(
+      buildReserveSeatInstruction({
+        buyer,
+        organizer: buyer,
+        eventPda,
+        ticketPda,
+        seatId: selectedSeat.id,
+      }),
+    );
+
+    transaction.feePayer = buyer;
+    const latestBlockhash = await connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = latestBlockhash.blockhash;
+
+    const result = await walletProvider.signAndSendTransaction(transaction);
+    const signature = typeof result === 'string' ? result : result.signature;
+    await connection.confirmTransaction(
+      {
+        signature,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      },
+      'confirmed',
+    );
+
+    return {
+      eventPda: eventPda.toString(),
+      ticketPda: ticketPda.toString(),
+      signature,
+      owner: buyer.toString(),
+    };
   }
 
   async function verifyTicket(event) {
@@ -216,7 +282,7 @@ function App() {
         <div>
           <strong>{wallet ? shortAddress(wallet) : 'No wallet connected'}</strong>
           <small>
-            Solana devnet {solBalance === null ? '' : `· ${solBalance.toFixed(4)} SOL`}
+            Solana devnet {solBalance === null ? '' : `- ${solBalance.toFixed(4)} SOL`}
           </small>
         </div>
         <div className="wallet-actions">
@@ -287,7 +353,7 @@ function App() {
             <dd>{selectedSeat.id}</dd>
             <dt>Wallet</dt>
             <dd>
-              <input value={wallet} onChange={(event) => setWallet(event.target.value)} />
+              <input value={wallet} readOnly />
             </dd>
             <dt>Network</dt>
             <dd>Solana devnet</dd>
@@ -302,9 +368,21 @@ function App() {
         <section className="panel narrow">
           <h2>Verify Ticket</h2>
           {ticket && (
-            <p className="muted">
-              Latest ticket: {ticket.seat_id} owned by {ticket.owner_wallet}
-            </p>
+            <div className="muted">
+              <p>Latest ticket: {ticket.seat_id} owned by {ticket.owner_wallet}</p>
+              {onChainTicket && (
+                <p>
+                  On-chain ticket: {shortAddress(onChainTicket.ticketPda)} -{' '}
+                  <a
+                    href={`https://explorer.solana.com/tx/${onChainTicket.signature}?cluster=devnet`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View tx
+                  </a>
+                </p>
+              )}
+            </div>
           )}
           <form onSubmit={verifyTicket}>
             <label>
@@ -341,6 +419,79 @@ function App() {
       )}
     </main>
   );
+}
+
+function buildInitializeEventInstruction({ organizer, eventPda, event, totalSeats }) {
+  return new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      { pubkey: organizer, isSigner: true, isWritable: true },
+      { pubkey: eventPda, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: concatBytes(
+      INITIALIZE_EVENT_DISCRIMINATOR,
+      encodeString(event.name),
+      encodeString(event.venue),
+      encodeU64(event.price_lamports),
+      encodeU32(totalSeats),
+      encodeU16(event.per_wallet_limit),
+      encodeU16(event.resale_cap_bps),
+      encodeU16(event.royalty_bps),
+    ),
+  });
+}
+
+function buildReserveSeatInstruction({ buyer, organizer, eventPda, ticketPda, seatId }) {
+  return new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      { pubkey: buyer, isSigner: true, isWritable: true },
+      { pubkey: organizer, isSigner: false, isWritable: true },
+      { pubkey: eventPda, isSigner: false, isWritable: true },
+      { pubkey: ticketPda, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: concatBytes(RESERVE_SEAT_DISCRIMINATOR, encodeString(seatId)),
+  });
+}
+
+function textBytes(value) {
+  return new TextEncoder().encode(value);
+}
+
+function encodeString(value) {
+  const bytes = textBytes(value);
+  return concatBytes(encodeU32(bytes.length), bytes);
+}
+
+function encodeU16(value) {
+  const bytes = new Uint8Array(2);
+  new DataView(bytes.buffer).setUint16(0, value, true);
+  return bytes;
+}
+
+function encodeU32(value) {
+  const bytes = new Uint8Array(4);
+  new DataView(bytes.buffer).setUint32(0, value, true);
+  return bytes;
+}
+
+function encodeU64(value) {
+  const bytes = new Uint8Array(8);
+  new DataView(bytes.buffer).setBigUint64(0, BigInt(value), true);
+  return bytes;
+}
+
+function concatBytes(...chunks) {
+  const length = chunks.reduce((total, chunk) => total + chunk.length, 0);
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return bytes;
 }
 
 function shortAddress(address) {
