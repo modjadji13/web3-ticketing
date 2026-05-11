@@ -1,6 +1,6 @@
 # Web3 Tickets Backend
 
-Rust/Axum backend for the Web3 ticketing architecture.
+Rust/Axum backend for the Web3 ticketing architecture, backed by PostgreSQL.
 
 It models the middleware and API boundary from the architecture document:
 
@@ -12,11 +12,19 @@ It models the middleware and API boundary from the architecture document:
 - capped resale via `transfer_ticket`
 - door validation via `verify_ticket`
 
-The first version uses in-memory state so it can run locally without Redis,
-PostgreSQL, Solana, IPFS, or LI.FI credentials. Those integrations can be added
-behind the same handlers.
+The backend persists event metadata, 90,000-seat venue inventory, seat holds,
+reservations, tickets, transfers, and scan state in PostgreSQL. Solana, IPFS,
+and LI.FI data are currently stored as references on the ticket record.
 
 ## Run
+
+Start PostgreSQL from the repo root:
+
+```powershell
+docker compose up -d postgres
+```
+
+Then run the backend:
 
 ```powershell
 cargo run
@@ -28,7 +36,12 @@ Server:
 http://127.0.0.1:8090
 ```
 
-Set `PORT` to use a different local port.
+Set `PORT` to use a different local port. Set `DATABASE_URL` to use a different
+PostgreSQL database. The default is:
+
+```text
+postgres://web3_tickets:web3_tickets@127.0.0.1:5433/web3_tickets
+```
 
 ## Endpoints
 
@@ -46,8 +59,9 @@ POST /api/tickets/verify
 
 ## Next Integration Points
 
-- Replace in-memory seat holds with Redis TTL keys.
-- Persist events, orders, and tickets in PostgreSQL.
+- Move schema creation into versioned SQL migrations.
+- Replace database-backed seat holds with Redis TTL keys if high-volume lock
+  throughput becomes necessary.
 - Emit seat-state broadcasts through WebSocket channels.
 - Replace ticket mint placeholders with Solana Anchor + Metaplex Bubblegum calls.
 - Add LI.FI quote/build-transaction endpoints for cross-chain checkout.

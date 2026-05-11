@@ -21,7 +21,7 @@ flowchart LR
   React --> Phantom[Phantom wallet]
   Phantom --> Solana[Solana Devnet RPC]
   React --> Backend[Rust Axum backend]
-  Backend --> Store[In-memory event, seat, ticket store]
+  Backend --> Store[PostgreSQL event, seat, ticket store]
   Backend --> TicketState[Seat status: available, held, reserved, used]
 ```
 
@@ -227,10 +227,10 @@ stateDiagram-v2
 
 Backend data ownership:
 
-- `events`: event metadata such as name, venue, chain, price, resale cap
-- `seats`: per-event map of seat id to seat state
-- `tickets`: local ticket records created after reservation
-- `holds`: stored on each seat with a five-minute expiry
+- `events`: PostgreSQL table for event metadata such as name, venue, chain, price, resale cap
+- `seats`: PostgreSQL table keyed by `(event_id, id)` for venue inventory and seat state
+- `tickets`: PostgreSQL table for ticket records created after reservation
+- `holds`: stored on each seat row as `hold_wallet_address` and `hold_expires_at`
 
 The J. Cole demo event seeds a 90,000-seat inventory in `generate_jcole_seats()`.
 
@@ -326,11 +326,10 @@ Invoke-RestMethod http://127.0.0.1:8090/api/events
 
 ## What A Third Party Should Know
 
-- The prototype is functional as a demo, but persistence is in-memory. Restarting the Rust backend resets events, seats, and tickets.
+- The prototype now persists events, seats, tickets, holds, transfers, and scan state in PostgreSQL. Restarting the Rust backend no longer resets ticket state while the Postgres volume remains.
 - The seat map image is not yet a real interactive vector map. Click targets are overlay tags.
 - Google sign-in needs the configured OAuth client id and matching authorized JavaScript origins.
 - Phantom must be installed and switched to Devnet for real wallet signing.
 - The `Devnet test checkout` button is a demo fallback that reserves in the backend without Phantom.
 - The backend currently trusts the frontend-provided Solana transaction result. A production version should verify the Solana transaction on the backend before creating the ticket.
-- Production should replace in-memory state with PostgreSQL/Redis and add real NFT metadata/storage.
-
+- Production should move startup schema creation into migrations, consider Redis for high-volume holds, and add real NFT metadata/storage.

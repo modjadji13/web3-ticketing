@@ -84,6 +84,7 @@ Stretch tracks:
 ## Run Backend
 
 ```powershell
+docker compose up -d postgres
 cd backend
 cargo run
 ```
@@ -110,9 +111,10 @@ http://127.0.0.1:8090
 - `programs/web3_tickets/src/lib.rs` implements event creation, seat reservation, ticket transfer, and ticket verification on-chain.
 - `backend/Cargo.toml` defines the Rust backend package and dependencies.
 - `backend/Cargo.lock` locks the Rust dependency versions.
+- `docker-compose.yml` runs the local PostgreSQL database on port `5433`.
 - `backend/.gitignore` keeps Rust build output out of Git.
 - `backend/.cargo/config.toml` configures the Windows GNU Rust linker workaround used on this machine.
 - `backend/.cargo/link-libs/libgcc.a` provides compiler runtime symbols for the local LLVM-MinGW linker.
 - `backend/.cargo/link-libs/libgcc_eh.a` provides unwind symbols for the local LLVM-MinGW linker.
-- `backend/src/main.rs` implements the Axum API for events, seat holds, reservations, transfers, and ticket verification.
+- `backend/src/main.rs` implements the Axum API for events, seat holds, reservations, transfers, and ticket verification using PostgreSQL persistence.
 - `backend/README.md` documents backend routes and integration points.
