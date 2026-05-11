@@ -51,8 +51,12 @@ async function reserveSeatInBackend(event, chainResult) {
   });
 }
 
+async function listSeats(event) {
+  return apiRequest(`/api/events/${event.id}/seats`);
+}
+
 function shortAddress(address) {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
 
-export { ensureBackendEvent, reserveSeatInBackend, shortAddress };
+export { ensureBackendEvent, listSeats, reserveSeatInBackend, shortAddress };

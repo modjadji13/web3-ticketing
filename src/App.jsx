@@ -3,7 +3,7 @@ import HomePage from './pages/HomePage';
 import TicketsPage from './pages/TicketsPage';
 import CheckoutPage from './pages/CheckoutPage';
 import FinalCheckoutPage from './pages/FinalCheckoutPage';
-import { ensureBackendEvent, reserveSeatInBackend, shortAddress } from './services/ticketApi';
+import { ensureBackendEvent, listSeats, reserveSeatInBackend, shortAddress } from './services/ticketApi';
 import { reserveStaticTicketOnChain } from './services/solanaTickets';
 
 function App() {
@@ -11,11 +11,22 @@ function App() {
   const [status, setStatus] = useState('');
   const [isBuying, setIsBuying] = useState(false);
   const [backendEvent, setBackendEvent] = useState(null);
+  const [seats, setSeats] = useState([]);
   const [ticket, setTicket] = useState(null);
 
   useEffect(() => {
-    ensureBackendEvent().then(setBackendEvent).catch((error) => setStatus(error.message));
+    ensureBackendEvent()
+      .then(async (event) => {
+        setBackendEvent(event);
+        setSeats(await listSeats(event));
+      })
+      .catch((error) => setStatus(error.message));
   }, []);
+
+  async function refreshSeats(event = backendEvent) {
+    if (!event) return;
+    setSeats(await listSeats(event));
+  }
 
   async function buyOnDevnet({ email } = {}) {
     setIsBuying(true);
@@ -26,6 +37,7 @@ function App() {
       const result = await reserveStaticTicketOnChain();
       const reservation = await reserveSeatInBackend(event, result);
       setTicket(reservation.ticket);
+      await refreshSeats(event);
       setStatus(
         `Reserved in backend and on Solana devnet for ${email}: ${shortAddress(result.signature)} - ticket ${shortAddress(reservation.ticket.id)}`,
       );
@@ -50,6 +62,7 @@ function App() {
       };
       const reservation = await reserveSeatInBackend(event, result);
       setTicket(reservation.ticket);
+      await refreshSeats(event);
       setStatus(
         `Devnet test checkout reserved ticket for ${email}: ${shortAddress(reservation.ticket.id)}`,
       );
@@ -64,7 +77,11 @@ function App() {
     <div className="min-h-screen bg-white text-gray-900 antialiased">
       {page === 'home' && <HomePage onTickets={() => setPage('tickets')} />}
       {page === 'tickets' && (
-        <TicketsPage onHome={() => setPage('home')} onCheckout={() => setPage('checkout')} />
+        <TicketsPage
+          onHome={() => setPage('home')}
+          onCheckout={() => setPage('checkout')}
+          seats={seats}
+        />
       )}
       {page === 'checkout' && (
         <CheckoutPage onTickets={() => setPage('tickets')} onFinal={() => setPage('final')} />

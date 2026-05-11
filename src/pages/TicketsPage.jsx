@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import {
   artistImage,
+  SELECTED_SEAT_ID,
   venueCapacity,
   venueSections,
 } from '../data/ticketData';
@@ -107,7 +108,16 @@ const ticketListings = [
   },
 ];
 
-function TicketsPage({ onHome, onCheckout }) {
+function TicketsPage({ onHome, onCheckout, seats = [] }) {
+  const selectedSeat = seats.find((seat) => seat.id === SELECTED_SEAT_ID);
+  const selectedSeatReserved = selectedSeat?.status === 'reserved';
+  const visibleMapPriceTags = selectedSeatReserved
+    ? mapPriceTags.filter((tag) => tag.section !== '538')
+    : mapPriceTags;
+  const visibleTicketListings = selectedSeatReserved
+    ? ticketListings.filter((listing) => !(listing.section === '538' && listing.row === 'G'))
+    : ticketListings;
+
   return (
     <main className="h-screen overflow-hidden bg-[#f4f5f7] text-[#06152b]">
       <header className="h-[92px] bg-white border-b border-[#e5e7eb] flex items-center justify-between px-8">
@@ -179,7 +189,7 @@ function TicketsPage({ onHome, onCheckout }) {
           >
             <StadiumAvailabilityMap />
             <div className="absolute inset-0">
-              {mapPriceTags.map(({ section, left, top, price, note, hot, deal, value }) => (
+              {visibleMapPriceTags.map(({ section, left, top, price, note, hot, deal, value }) => (
                 <button
                   className="tag-box"
                   key={`${section}-${left}-${top}`}
@@ -207,6 +217,11 @@ function TicketsPage({ onHome, onCheckout }) {
               ))}
             </div>
           </div>
+          {selectedSeatReserved && (
+            <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-white px-4 py-2 text-[13px] font-bold text-[#147a38] shadow-md">
+              Section 538 - Row G is reserved
+            </div>
+          )}
         </div>
 
         <aside className="bg-white border-l border-slate-200 h-full overflow-y-auto">
@@ -229,7 +244,7 @@ function TicketsPage({ onHome, onCheckout }) {
             </div>
           </div>
 
-          {ticketListings.map((item, index) => (
+          {visibleTicketListings.map((item, index) => (
             <button
               className="w-full text-left px-5 py-[20px] border-b border-slate-200 hover:bg-slate-50 transition-colors"
               key={`${item.section}-${index}`}
@@ -269,6 +284,11 @@ function TicketsPage({ onHome, onCheckout }) {
               )}
             </button>
           ))}
+          {selectedSeatReserved && (
+            <div className="px-5 py-5 text-[14px] font-semibold text-[#147a38]">
+              Section 538 - Row G has been bought and removed from available listings.
+            </div>
+          )}
         </aside>
       </section>
     </main>
