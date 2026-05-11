@@ -5,7 +5,16 @@ import { seatLabelFromId } from '../data/ticketData';
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 const googleIdentityScript = 'https://accounts.google.com/gsi/client';
 
-function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, ticket, selectedSeatId }) {
+function FinalCheckoutPage({
+  isBuying,
+  onCheckout,
+  onBuy,
+  onTestBuy,
+  status,
+  ticket,
+  selectedSeatId,
+  voiceStatus,
+}) {
   const [email, setEmail] = useState('');
   const [emailTouched, setEmailTouched] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
@@ -172,6 +181,7 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, tic
               </div>
               {authMessage && <p className="text-[14px] text-[#0a58ca] mb-3">{authMessage}</p>}
               {status && <p className="text-[14px] text-[#0a58ca] mb-6">{status}</p>}
+              {voiceStatus && <p className="text-[14px] text-[#147a38] mb-6">{voiceStatus}</p>}
               {ticket && (
                 <p className="text-[13px] text-gray-500 mb-6">
                   Backend ticket: {ticket.id} / seat {ticket.seat_id}
@@ -203,6 +213,7 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, tic
           status={status}
           ticket={ticket}
           seatLabel={seatLabel}
+          voiceStatus={voiceStatus}
         />
       )}
       <Footer />
@@ -210,7 +221,17 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, tic
   );
 }
 
-function SolanaPaymentModal({ email, isBuying, onClose, onPay, onTestPay, status, ticket, seatLabel }) {
+function SolanaPaymentModal({
+  email,
+  isBuying,
+  onClose,
+  onPay,
+  onTestPay,
+  status,
+  ticket,
+  seatLabel,
+  voiceStatus,
+}) {
   const [phantomInstalled, setPhantomInstalled] = useState(() => Boolean(window.solana?.isPhantom));
 
   function refreshWalletStatus() {
@@ -294,6 +315,7 @@ function SolanaPaymentModal({ email, isBuying, onClose, onPay, onTestPay, status
           </div>
 
           {status && <p className="mt-4 text-[14px] text-[#0a58ca]">{status}</p>}
+          {voiceStatus && <p className="mt-3 text-[14px] font-medium text-[#147a38]">{voiceStatus}</p>}
           {ticket && (
             <p className="mt-3 rounded-lg bg-[#e7f5e8] px-3 py-2 text-[13px] font-semibold text-[#147a38]">
               Ticket reserved: {ticket.id} / seat {ticket.seat_id}

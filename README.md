@@ -40,6 +40,19 @@ http://localhost:5174
 
 Restart Vite after changing `.env.local`.
 
+## ElevenLabs Voice Confirmation
+
+The checkout calls the Rust backend after a ticket reservation succeeds. The backend then calls ElevenLabs and returns MP3 audio to the browser, so the API key never ships in frontend JavaScript.
+
+Add these backend environment variables before starting `cargo run`:
+
+```text
+ELEVENLABS_API_KEY=your-elevenlabs-api-key
+ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM
+```
+
+If `ELEVENLABS_API_KEY` is missing, checkout still completes and shows that voice confirmation was skipped.
+
 ## Web3 Setup
 
 - Install Phantom and switch it to Solana Devnet.

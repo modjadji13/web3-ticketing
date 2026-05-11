@@ -3,9 +3,15 @@ import HomePage from './pages/HomePage';
 import TicketsPage from './pages/TicketsPage';
 import CheckoutPage from './pages/CheckoutPage';
 import FinalCheckoutPage from './pages/FinalCheckoutPage';
-import { ensureBackendEvent, listSeats, reserveSeatInBackend, shortAddress } from './services/ticketApi';
+import {
+  ensureBackendEvent,
+  listSeats,
+  playVoiceConfirmation,
+  reserveSeatInBackend,
+  shortAddress,
+} from './services/ticketApi';
 import { reserveStaticTicketOnChain } from './services/solanaTickets';
-import { DEFAULT_SEAT_ID, seatLabelFromId } from './data/ticketData';
+import { DEFAULT_SEAT_ID, seatLabelFromId, ticketEvent } from './data/ticketData';
 
 function App() {
   const [page, setPage] = useState('home');
@@ -15,6 +21,7 @@ function App() {
   const [seats, setSeats] = useState([]);
   const [ticket, setTicket] = useState(null);
   const [selectedSeatId, setSelectedSeatId] = useState(DEFAULT_SEAT_ID);
+  const [voiceStatus, setVoiceStatus] = useState('');
 
   useEffect(() => {
     ensureBackendEvent()
@@ -30,15 +37,31 @@ function App() {
     setSeats(await listSeats(event));
   }
 
+  async function confirmReservationByVoice({ email, reservedTicket, seatId }) {
+    try {
+      const message = await playVoiceConfirmation({
+        eventName: ticketEvent.name,
+        seatLabel: seatLabelFromId(seatId),
+        email,
+        ticket: reservedTicket,
+      });
+      setVoiceStatus(message);
+    } catch (error) {
+      setVoiceStatus(`Voice confirmation skipped: ${error.message}`);
+    }
+  }
+
   async function buyOnDevnet({ email } = {}) {
     setIsBuying(true);
     setStatus('');
+    setVoiceStatus('');
     try {
       const event = backendEvent || (await ensureBackendEvent());
       setBackendEvent(event);
       const result = await reserveStaticTicketOnChain(selectedSeatId);
       const reservation = await reserveSeatInBackend(event, result, selectedSeatId);
       setTicket(reservation.ticket);
+      await confirmReservationByVoice({ email, reservedTicket: reservation.ticket, seatId: selectedSeatId });
       await refreshSeats(event);
       setStatus(
         `Reserved ${seatLabelFromId(selectedSeatId)} in backend and on Solana devnet for ${email}: ${shortAddress(result.signature)} - ticket ${shortAddress(reservation.ticket.id)}`,
@@ -53,6 +76,7 @@ function App() {
   async function buyWithDevnetTest({ email } = {}) {
     setIsBuying(true);
     setStatus('');
+    setVoiceStatus('');
     try {
       const event = backendEvent || (await ensureBackendEvent());
       setBackendEvent(event);
@@ -64,6 +88,7 @@ function App() {
       };
       const reservation = await reserveSeatInBackend(event, result, selectedSeatId);
       setTicket(reservation.ticket);
+      await confirmReservationByVoice({ email, reservedTicket: reservation.ticket, seatId: selectedSeatId });
       await refreshSeats(event);
       setStatus(
         `Devnet test checkout reserved ${seatLabelFromId(selectedSeatId)} for ${email}: ${shortAddress(reservation.ticket.id)}`,
@@ -85,6 +110,7 @@ function App() {
             setSelectedSeatId(seatId || DEFAULT_SEAT_ID);
             setTicket(null);
             setStatus('');
+            setVoiceStatus('');
             setPage('checkout');
           }}
           seats={seats}
@@ -106,6 +132,7 @@ function App() {
           status={status}
           ticket={ticket}
           selectedSeatId={selectedSeatId}
+          voiceStatus={voiceStatus}
         />
       )}
     </div>

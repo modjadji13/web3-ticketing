@@ -43,6 +43,10 @@ PostgreSQL database. The default is:
 postgres://web3_tickets:web3_tickets@127.0.0.1:5433/web3_tickets
 ```
 
+Set `ELEVENLABS_API_KEY` to enable voice confirmations after checkout. You can
+also set `ELEVENLABS_VOICE_ID`; otherwise the backend uses the demo default
+voice id.
+
 ## Endpoints
 
 ```text
@@ -55,6 +59,7 @@ POST /api/events/:event_id/seats/:seat_id/reserve
 GET  /api/tickets/:ticket_id
 POST /api/tickets/:ticket_id/transfer
 POST /api/tickets/verify
+POST /api/voice/confirmation
 ```
 
 ## Next Integration Points

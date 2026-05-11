@@ -1,6 +1,7 @@
 use axum::{
+    body::Body,
     extract::{Path, State},
-    http::StatusCode,
+    http::{header, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
@@ -146,6 +147,27 @@ struct VerifyTicketResponse {
     ticket: Option<Ticket>,
 }
 
+#[derive(Deserialize)]
+struct VoiceConfirmationRequest {
+    event_name: String,
+    seat_label: String,
+    email: Option<String>,
+    ticket_id: Option<Uuid>,
+}
+
+#[derive(Serialize)]
+struct ElevenLabsTextToSpeechRequest {
+    text: String,
+    model_id: &'static str,
+    voice_settings: ElevenLabsVoiceSettings,
+}
+
+#[derive(Serialize)]
+struct ElevenLabsVoiceSettings {
+    stability: f32,
+    similarity_boost: f32,
+}
+
 #[derive(Debug, Serialize)]
 struct ApiError {
     error: String,
@@ -191,6 +213,7 @@ async fn main() {
         .route("/api/tickets/:ticket_id", get(get_ticket))
         .route("/api/tickets/:ticket_id/transfer", post(transfer_ticket))
         .route("/api/tickets/verify", post(verify_ticket))
+        .route("/api/voice/confirmation", post(create_voice_confirmation))
         .with_state(state)
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http());
@@ -574,6 +597,62 @@ async fn verify_ticket(
     }))
 }
 
+async fn create_voice_confirmation(
+    Json(payload): Json<VoiceConfirmationRequest>,
+) -> Result<Response, ApiError> {
+    let api_key = std::env::var("ELEVENLABS_API_KEY").map_err(|_| {
+        bad_request("ElevenLabs is not configured. Set ELEVENLABS_API_KEY on the backend.")
+    })?;
+    let voice_id =
+        std::env::var("ELEVENLABS_VOICE_ID").unwrap_or_else(|_| "21m00Tcm4TlvDq8ikWAM".into());
+    let ticket_ref = payload
+        .ticket_id
+        .map(|id| format!(" Ticket reference {id}."))
+        .unwrap_or_default();
+    let email_line = payload
+        .email
+        .filter(|email| !email.trim().is_empty())
+        .map(|email| format!(" A receipt was linked to {email}."))
+        .unwrap_or_default();
+    let message = format!(
+        "Your {} ticket for {} is confirmed. The seat is now reserved on Solana Devnet and recorded in the Web3 Tickets backend.{}{}",
+        payload.event_name, payload.seat_label, ticket_ref, email_line
+    );
+    let tts_request = ElevenLabsTextToSpeechRequest {
+        text: message,
+        model_id: "eleven_multilingual_v2",
+        voice_settings: ElevenLabsVoiceSettings {
+            stability: 0.45,
+            similarity_boost: 0.75,
+        },
+    };
+    let endpoint = format!("https://api.elevenlabs.io/v1/text-to-speech/{voice_id}");
+    let response = reqwest::Client::new()
+        .post(endpoint)
+        .header("xi-api-key", api_key)
+        .header(header::ACCEPT, "audio/mpeg")
+        .json(&tts_request)
+        .send()
+        .await
+        .map_err(elevenlabs_error)?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(bad_request(&format!(
+            "ElevenLabs request failed with status {status}: {}",
+            body.chars().take(180).collect::<String>()
+        )));
+    }
+
+    let audio = response.bytes().await.map_err(elevenlabs_error)?;
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "audio/mpeg")
+        .body(Body::from(audio))
+        .map_err(|error| bad_request(&format!("voice response build failed: {error}")))
+}
+
 async fn insert_event(db: &PgPool, event: &Event) -> Result<(), ApiError> {
     sqlx::query(
         r#"
@@ -945,6 +1024,12 @@ fn i32_to_u16(value: i32) -> Result<u16, ApiError> {
 fn db_error(error: sqlx::Error) -> ApiError {
     ApiError {
         error: format!("database error: {error}"),
+    }
+}
+
+fn elevenlabs_error(error: reqwest::Error) -> ApiError {
+    ApiError {
+        error: format!("ElevenLabs request failed: {error}"),
     }
 }
 
