@@ -14,6 +14,32 @@ Frontend:
 http://127.0.0.1:5173
 ```
 
+## Google Sign-In Setup
+
+Google checkout sign-in needs a Google OAuth Web client ID. Create one in Google Cloud Console, then put it in a local env file that is not committed:
+
+```powershell
+Copy-Item .env.example .env.local
+notepad .env.local
+```
+
+Set:
+
+```text
+VITE_GOOGLE_CLIENT_ID=your-real-web-client-id.apps.googleusercontent.com
+```
+
+For local development, add these authorized JavaScript origins to the Google OAuth client:
+
+```text
+http://127.0.0.1:5173
+http://127.0.0.1:5174
+http://localhost:5173
+http://localhost:5174
+```
+
+Restart Vite after changing `.env.local`.
+
 ## Web3 Setup
 
 - Install Phantom and switch it to Solana Devnet.

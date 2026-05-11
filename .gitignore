@@ -1,6 +1,8 @@
 node_modules/
 .tools/
 dist/
+.env.local
+.env.*.local
 *.log
 *.err.log
 npm-latest.json

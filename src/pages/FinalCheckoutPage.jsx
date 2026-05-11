@@ -19,7 +19,9 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, tic
 
   useEffect(() => {
     if (!googleClientId) {
-      setAuthMessage('Add VITE_GOOGLE_CLIENT_ID to enable Google sign-in.');
+      setAuthMessage(
+        'Google sign-in is not configured. Add VITE_GOOGLE_CLIENT_ID to .env.local and restart Vite.',
+      );
       return;
     }
 
@@ -64,7 +66,9 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, tic
 
   function handleGoogleSignIn() {
     if (!googleClientId) {
-      setAuthMessage('Google sign-in needs VITE_GOOGLE_CLIENT_ID in your environment.');
+      setAuthMessage(
+        'Google sign-in needs a Web OAuth client id. Add VITE_GOOGLE_CLIENT_ID to .env.local and restart Vite.',
+      );
       return;
     }
 
