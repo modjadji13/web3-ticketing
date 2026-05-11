@@ -288,14 +288,14 @@ function CheckoutHeader({ onBack, timer }) {
   );
 }
 
-function OrderSummary({ onFinal }) {
+function OrderSummary({ onFinal, seatLabel = 'Section 538 - Row G' }) {
   return (
     <aside>
       <div className="bg-white rounded-[14px] border border-gray-200 shadow-[0_2px_12px_rgba(0,0,0,0.06)] overflow-hidden">
         <div className="bg-[#fef8f9] border-b border-[#fce7ea] px-5 py-3 flex items-center gap-2">
           <TicketIcon />
           <span className="text-[14px] text-gray-900 font-medium">
-            Last tickets remaining in Row G in Section 538
+            Last tickets remaining for {seatLabel}
           </span>
         </div>
         <div className="p-6">
@@ -325,14 +325,14 @@ function OrderSummary({ onFinal }) {
   );
 }
 
-function FinalOrderCard() {
+function FinalOrderCard({ seatLabel = 'Section 538 - Row G' }) {
   return (
     <aside>
       <div className="bg-white rounded-[14px] border border-gray-200 shadow-[0_2px_12px_rgba(0,0,0,0.06)] overflow-hidden">
         <div className="bg-[#fef8f9] border-b border-[#fce7ea] px-5 py-3 flex items-center gap-2">
           <TicketIcon />
           <span className="text-[14px] text-gray-900 font-medium">
-            Last tickets remaining in Row G in Section 538
+            Last tickets remaining for {seatLabel}
           </span>
         </div>
         <div className="p-6">
@@ -350,7 +350,7 @@ function FinalOrderCard() {
           <div className="my-5 border-t border-gray-100" />
           <div className="flex justify-between items-center">
             <div>
-              <h3 className="font-bold text-[16px] text-gray-900 mb-0.5">Section 538 - Row G</h3>
+              <h3 className="font-bold text-[16px] text-gray-900 mb-0.5">{seatLabel}</h3>
               <p className="text-[14px] text-gray-600">1 ticket</p>
             </div>
             <button className="border border-gray-300 rounded-md px-4 py-1.5 text-[14px] font-medium text-gray-700 hover:bg-gray-50 transition-colors">

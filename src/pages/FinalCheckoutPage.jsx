@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckoutHeader, ChevronIcon, FinalOrderCard, Footer, GoogleIcon, SellingFast } from '../components/TicketUi';
+import { seatLabelFromId } from '../data/ticketData';
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 const googleIdentityScript = 'https://accounts.google.com/gsi/client';
 
-function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, ticket }) {
+function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, ticket, selectedSeatId }) {
   const [email, setEmail] = useState('');
   const [emailTouched, setEmailTouched] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
@@ -12,6 +13,7 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, tic
   const [authMessage, setAuthMessage] = useState('');
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [confirmedEmail, setConfirmedEmail] = useState('');
+  const seatLabel = seatLabelFromId(selectedSeatId);
 
   const emailIsValid = useMemo(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), [email]);
 
@@ -183,7 +185,7 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, tic
                 .
               </p>
             </section>
-            <FinalOrderCard />
+            <FinalOrderCard seatLabel={seatLabel} />
           </div>
         </div>
       </main>
@@ -196,6 +198,7 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, tic
           onTestPay={handleDevnetTestPayment}
           status={status}
           ticket={ticket}
+          seatLabel={seatLabel}
         />
       )}
       <Footer />
@@ -203,7 +206,7 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, tic
   );
 }
 
-function SolanaPaymentModal({ email, isBuying, onClose, onPay, onTestPay, status, ticket }) {
+function SolanaPaymentModal({ email, isBuying, onClose, onPay, onTestPay, status, ticket, seatLabel }) {
   const [phantomInstalled, setPhantomInstalled] = useState(() => Boolean(window.solana?.isPhantom));
 
   function refreshWalletStatus() {
@@ -241,7 +244,7 @@ function SolanaPaymentModal({ email, isBuying, onClose, onPay, onTestPay, status
             </div>
             <div className="mt-3 flex justify-between gap-4 text-[15px]">
               <span className="text-gray-500">Seat</span>
-              <span className="font-bold text-gray-900">Section 538 - Row G</span>
+              <span className="font-bold text-gray-900">{seatLabel}</span>
             </div>
             <div className="mt-3 flex justify-between gap-4 text-[15px]">
               <span className="text-gray-500">Network</span>

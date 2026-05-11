@@ -1,5 +1,37 @@
 export const SELECTED_SEAT_ID = '538-G';
 
+export const DEFAULT_SEAT_ID = SELECTED_SEAT_ID;
+
+const sectionSeatAliases = {
+  '531': '531-X',
+  '535': '535-ROW',
+  '536': '536-ROW',
+  '538': '538-G',
+  '545': '545-ROW',
+  GA: 'GENERAL-ADMISSION-1',
+  'GENERAL-ADMISSION': 'GENERAL-ADMISSION-1',
+  FRONT: 'FRONT-ZONE-NORTH-1',
+  'FRONT-ZONE-NORTH': 'FRONT-ZONE-NORTH-1',
+  VIP: 'VIP-1',
+};
+
+export function seatIdForSection(section) {
+  return sectionSeatAliases[section] || `${section}-1`;
+}
+
+export function seatLabelFromId(seatId = DEFAULT_SEAT_ID) {
+  if (seatId.startsWith('GENERAL-ADMISSION')) return 'General Admission';
+  if (seatId.startsWith('FRONT-ZONE')) return 'Front Zone Standing';
+  if (seatId.startsWith('VIP')) return 'VIP';
+
+  const [section, row] = seatId.split('-');
+  if (!row || /^\d+$/.test(row)) {
+    return `Section ${section}`;
+  }
+
+  return `Section ${section} - Row ${row}`;
+}
+
 export const ticketEvent = {
   name: 'J. Cole',
   venue: 'FNB Stadium, Johannesburg, Gauteng, South Africa',

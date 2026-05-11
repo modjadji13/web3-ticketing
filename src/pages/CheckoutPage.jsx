@@ -1,6 +1,9 @@
 import { Badge, CheckoutHeader, Feature, Footer, OrderSummary, SellingFast, StadiumMap } from '../components/TicketUi';
+import { seatLabelFromId } from '../data/ticketData';
 
-function CheckoutPage({ onTickets, onFinal }) {
+function CheckoutPage({ onTickets, onFinal, selectedSeatId }) {
+  const seatLabel = seatLabelFromId(selectedSeatId);
+
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <CheckoutHeader onBack={onTickets} timer="09:54" />
@@ -14,7 +17,7 @@ function CheckoutPage({ onTickets, onFinal }) {
               </div>
             </div>
             <div className="mt-8">
-              <h1 className="text-[22px] font-bold text-gray-900 leading-tight">Section 538 - Row G</h1>
+              <h1 className="text-[22px] font-bold text-gray-900 leading-tight">{seatLabel}</h1>
               <p className="text-[15px] text-gray-500 mt-1">1 ticket</p>
               <div className="flex flex-wrap items-center gap-3 mt-4">
                 <Badge tone="danger">High demand</Badge>
@@ -26,7 +29,7 @@ function CheckoutPage({ onTickets, onFinal }) {
               </div>
             </div>
           </section>
-          <OrderSummary onFinal={onFinal} />
+          <OrderSummary onFinal={onFinal} seatLabel={seatLabel} />
         </div>
       </main>
       <Footer />

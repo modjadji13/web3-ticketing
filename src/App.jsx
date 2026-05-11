@@ -5,6 +5,7 @@ import CheckoutPage from './pages/CheckoutPage';
 import FinalCheckoutPage from './pages/FinalCheckoutPage';
 import { ensureBackendEvent, listSeats, reserveSeatInBackend, shortAddress } from './services/ticketApi';
 import { reserveStaticTicketOnChain } from './services/solanaTickets';
+import { DEFAULT_SEAT_ID, seatLabelFromId } from './data/ticketData';
 
 function App() {
   const [page, setPage] = useState('home');
@@ -13,6 +14,7 @@ function App() {
   const [backendEvent, setBackendEvent] = useState(null);
   const [seats, setSeats] = useState([]);
   const [ticket, setTicket] = useState(null);
+  const [selectedSeatId, setSelectedSeatId] = useState(DEFAULT_SEAT_ID);
 
   useEffect(() => {
     ensureBackendEvent()
@@ -34,12 +36,12 @@ function App() {
     try {
       const event = backendEvent || (await ensureBackendEvent());
       setBackendEvent(event);
-      const result = await reserveStaticTicketOnChain();
-      const reservation = await reserveSeatInBackend(event, result);
+      const result = await reserveStaticTicketOnChain(selectedSeatId);
+      const reservation = await reserveSeatInBackend(event, result, selectedSeatId);
       setTicket(reservation.ticket);
       await refreshSeats(event);
       setStatus(
-        `Reserved in backend and on Solana devnet for ${email}: ${shortAddress(result.signature)} - ticket ${shortAddress(reservation.ticket.id)}`,
+        `Reserved ${seatLabelFromId(selectedSeatId)} in backend and on Solana devnet for ${email}: ${shortAddress(result.signature)} - ticket ${shortAddress(reservation.ticket.id)}`,
       );
     } catch (error) {
       setStatus(error.message);
@@ -60,11 +62,11 @@ function App() {
         signature: `devnet-test-payment-${timestamp}`,
         ticketPda: `devnet-test-ticket-${timestamp}`,
       };
-      const reservation = await reserveSeatInBackend(event, result);
+      const reservation = await reserveSeatInBackend(event, result, selectedSeatId);
       setTicket(reservation.ticket);
       await refreshSeats(event);
       setStatus(
-        `Devnet test checkout reserved ticket for ${email}: ${shortAddress(reservation.ticket.id)}`,
+        `Devnet test checkout reserved ${seatLabelFromId(selectedSeatId)} for ${email}: ${shortAddress(reservation.ticket.id)}`,
       );
     } catch (error) {
       setStatus(error.message);
@@ -79,12 +81,21 @@ function App() {
       {page === 'tickets' && (
         <TicketsPage
           onHome={() => setPage('home')}
-          onCheckout={() => setPage('checkout')}
+          onCheckout={(seatId) => {
+            setSelectedSeatId(seatId || DEFAULT_SEAT_ID);
+            setTicket(null);
+            setStatus('');
+            setPage('checkout');
+          }}
           seats={seats}
         />
       )}
       {page === 'checkout' && (
-        <CheckoutPage onTickets={() => setPage('tickets')} onFinal={() => setPage('final')} />
+        <CheckoutPage
+          onTickets={() => setPage('tickets')}
+          onFinal={() => setPage('final')}
+          selectedSeatId={selectedSeatId}
+        />
       )}
       {page === 'final' && (
         <FinalCheckoutPage
@@ -94,6 +105,7 @@ function App() {
           onTestBuy={buyWithDevnetTest}
           status={status}
           ticket={ticket}
+          selectedSeatId={selectedSeatId}
         />
       )}
     </div>

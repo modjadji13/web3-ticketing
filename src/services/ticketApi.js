@@ -1,4 +1,4 @@
-import { SELECTED_SEAT_ID, ticketEvent } from '../data/ticketData';
+import { DEFAULT_SEAT_ID, ticketEvent } from '../data/ticketData';
 
 const API_URL = 'http://127.0.0.1:8090';
 
@@ -39,14 +39,14 @@ async function ensureBackendEvent() {
   });
 }
 
-async function reserveSeatInBackend(event, chainResult) {
-  return apiRequest(`/api/events/${event.id}/seats/${SELECTED_SEAT_ID}/reserve`, {
+async function reserveSeatInBackend(event, chainResult, seatId = DEFAULT_SEAT_ID) {
+  return apiRequest(`/api/events/${event.id}/seats/${seatId}/reserve`, {
     method: 'POST',
     body: JSON.stringify({
       wallet_address: chainResult.owner,
       payment_signature: chainResult.signature,
       onchain_ticket_address: chainResult.ticketPda,
-      metadata_uri: `ipfs://j-cole-${SELECTED_SEAT_ID}`,
+      metadata_uri: `ipfs://j-cole-${seatId}`,
     }),
   });
 }

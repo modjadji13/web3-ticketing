@@ -13,7 +13,8 @@ import {
 } from 'lucide-react';
 import {
   artistImage,
-  SELECTED_SEAT_ID,
+  seatIdForSection,
+  seatLabelFromId,
   venueCapacity,
   venueSections,
 } from '../data/ticketData';
@@ -53,6 +54,7 @@ const ticketListings = [
     price: 'R935',
     ticket: '1 ticket',
     capacity: 550,
+    seatId: '538-G',
     tags: ['Best price', 'Viewed'],
   },
   {
@@ -61,6 +63,7 @@ const ticketListings = [
     price: 'R959',
     ticket: '1 ticket',
     capacity: 550,
+    seatId: '531-X',
     tags: [],
   },
   {
@@ -69,6 +72,7 @@ const ticketListings = [
     price: 'R1,093',
     ticket: '1 ticket',
     capacity: 550,
+    seatId: '545-ROW',
     aisle: true,
     tags: ['Best deal', '2 tickets remaining in this listing', 'Last tickets'],
   },
@@ -78,6 +82,7 @@ const ticketListings = [
     price: 'R1,093',
     ticket: '1 ticket',
     capacity: 550,
+    seatId: '535-ROW',
     aisle: true,
     tags: [],
   },
@@ -87,6 +92,7 @@ const ticketListings = [
     price: 'R1,093',
     ticket: '1 ticket',
     capacity: 550,
+    seatId: '536-ROW',
     aisle: true,
     tags: [],
   },
@@ -96,6 +102,7 @@ const ticketListings = [
     price: 'R1,250',
     ticket: '18,500 tickets',
     capacity: 18500,
+    seatId: 'GENERAL-ADMISSION-1',
     tags: ['Best deal'],
   },
   {
@@ -104,19 +111,20 @@ const ticketListings = [
     price: 'R3,674',
     ticket: '12,000 tickets',
     capacity: 12000,
+    seatId: 'FRONT-ZONE-NORTH-1',
     tags: ['Last tickets'],
   },
 ];
 
 function TicketsPage({ onHome, onCheckout, seats = [] }) {
-  const selectedSeat = seats.find((seat) => seat.id === SELECTED_SEAT_ID);
-  const selectedSeatReserved = selectedSeat?.status === 'reserved';
-  const visibleMapPriceTags = selectedSeatReserved
-    ? mapPriceTags.filter((tag) => tag.section !== '538')
-    : mapPriceTags;
-  const visibleTicketListings = selectedSeatReserved
-    ? ticketListings.filter((listing) => !(listing.section === '538' && listing.row === 'G'))
-    : ticketListings;
+  const reservedSeatIds = new Set(
+    seats.filter((seat) => seat.status === 'reserved').map((seat) => seat.id),
+  );
+  const visibleMapPriceTags = mapPriceTags
+    .map((tag) => ({ ...tag, seatId: seatIdForSection(tag.section) }))
+    .filter((tag) => !reservedSeatIds.has(tag.seatId));
+  const visibleTicketListings = ticketListings.filter((listing) => !reservedSeatIds.has(listing.seatId));
+  const reservedVisibleSeats = seats.filter((seat) => seat.status === 'reserved').slice(0, 3);
 
   return (
     <main className="h-screen overflow-hidden bg-[#f4f5f7] text-[#06152b]">
@@ -189,13 +197,13 @@ function TicketsPage({ onHome, onCheckout, seats = [] }) {
           >
             <StadiumAvailabilityMap />
             <div className="absolute inset-0">
-              {visibleMapPriceTags.map(({ section, left, top, price, note, hot, deal, value }) => (
+              {visibleMapPriceTags.map(({ section, seatId, left, top, price, note, hot, deal, value }) => (
                 <button
                   className="tag-box"
                   key={`${section}-${left}-${top}`}
-                  onClick={onCheckout}
+                  onClick={() => onCheckout(seatId)}
                   style={{ left, top }}
-                  title={`Section ${section}`}
+                  title={`${section} maps to backend seat ${seatId}`}
                 >
                   <span className="flex items-center gap-1 text-[13px] font-bold text-gray-900 leading-none">
                     {hot && <Flame size={14} fill="currentColor" className="text-[#e60046]" />}
@@ -217,9 +225,9 @@ function TicketsPage({ onHome, onCheckout, seats = [] }) {
               ))}
             </div>
           </div>
-          {selectedSeatReserved && (
+          {reservedVisibleSeats.length > 0 && (
             <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-white px-4 py-2 text-[13px] font-bold text-[#147a38] shadow-md">
-              Section 538 - Row G is reserved
+              Reserved seats hidden: {reservedVisibleSeats.map((seat) => seatLabelFromId(seat.id)).join(', ')}
             </div>
           )}
         </div>
@@ -248,7 +256,7 @@ function TicketsPage({ onHome, onCheckout, seats = [] }) {
             <button
               className="w-full text-left px-5 py-[20px] border-b border-slate-200 hover:bg-slate-50 transition-colors"
               key={`${item.section}-${index}`}
-              onClick={onCheckout}
+              onClick={() => onCheckout(item.seatId)}
             >
               <div className="flex justify-between items-start">
                 <div>
@@ -284,9 +292,9 @@ function TicketsPage({ onHome, onCheckout, seats = [] }) {
               )}
             </button>
           ))}
-          {selectedSeatReserved && (
+          {reservedVisibleSeats.length > 0 && (
             <div className="px-5 py-5 text-[14px] font-semibold text-[#147a38]">
-              Section 538 - Row G has been bought and removed from available listings.
+              Bought seats are removed from available listings after the backend marks them reserved.
             </div>
           )}
         </aside>

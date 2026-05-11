@@ -1,12 +1,12 @@
 import { clusterApiUrl, Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
-import { SELECTED_SEAT_ID, ticketEvent } from '../data/ticketData';
+import { DEFAULT_SEAT_ID, ticketEvent } from '../data/ticketData';
 
 const PROGRAM_ID = new PublicKey('35wzuQvuh6PkqoTe8sgZu8hx8cV4sG2G8h89zELaLmKD');
 const INITIALIZE_EVENT_DISCRIMINATOR = Uint8Array.from([126, 249, 86, 221, 202, 171, 134, 20]);
 const RESERVE_SEAT_DISCRIMINATOR = Uint8Array.from([42, 147, 222, 136, 162, 134, 183, 168]);
 const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
 
-async function reserveStaticTicketOnChain() {
+async function reserveStaticTicketOnChain(seatId = DEFAULT_SEAT_ID) {
   const provider = window.solana?.isPhantom ? window.solana : null;
   if (!provider) {
     throw new Error('Install Phantom wallet, switch it to Devnet, then try again.');
@@ -19,7 +19,7 @@ async function reserveStaticTicketOnChain() {
     PROGRAM_ID,
   );
   const [ticketPda] = PublicKey.findProgramAddressSync(
-    [textBytes('ticket'), eventPda.toBuffer(), textBytes(SELECTED_SEAT_ID)],
+    [textBytes('ticket'), eventPda.toBuffer(), textBytes(seatId)],
     PROGRAM_ID,
   );
 
@@ -57,7 +57,7 @@ async function reserveStaticTicketOnChain() {
         { pubkey: ticketPda, isSigner: false, isWritable: true },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
-      data: concatBytes(RESERVE_SEAT_DISCRIMINATOR, encodeString(SELECTED_SEAT_ID)),
+      data: concatBytes(RESERVE_SEAT_DISCRIMINATOR, encodeString(seatId)),
     }),
   );
 
