@@ -349,34 +349,43 @@ function SolanaPaymentModal({
             </div>
           </div>
 
-          <div className="mt-5 rounded-xl border border-[#dbeafe] bg-[#eff6ff] p-4 text-[14px] text-[#1d4ed8]">
-            <div className="font-bold">
-              {phantomInstalled ? 'Phantom detected' : 'Phantom wallet required'}
+          {ticket ? (
+            <div className="mt-5 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] p-4 text-[14px] text-[#166534]">
+              <div className="font-bold">Reservation complete</div>
+              <p className="mt-1">
+                Your ticket is reserved. You can close this window and view your ticket details.
+              </p>
             </div>
-            <p className="mt-1">
-              {phantomInstalled
-                ? 'Switch Phantom to Devnet before paying. The app signs the reservation transaction with your wallet and records the ticket in the backend.'
-                : 'Install Phantom, enable it in your browser, then return here and check again.'}
-            </p>
-            {!phantomInstalled && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  className="rounded-md bg-[#1d4ed8] px-3 py-2 text-[13px] font-bold text-white hover:bg-[#1e40af]"
-                  onClick={openPhantomInstall}
-                  type="button"
-                >
-                  Install Phantom
-                </button>
-                <button
-                  className="rounded-md border border-[#93c5fd] bg-white px-3 py-2 text-[13px] font-bold text-[#1d4ed8] hover:bg-[#dbeafe]"
-                  onClick={refreshWalletStatus}
-                  type="button"
-                >
-                  I installed it
-                </button>
+          ) : (
+            <div className="mt-5 rounded-xl border border-[#dbeafe] bg-[#eff6ff] p-4 text-[14px] text-[#1d4ed8]">
+              <div className="font-bold">
+                {phantomInstalled ? 'Phantom detected' : 'Phantom wallet required'}
               </div>
-            )}
-          </div>
+              <p className="mt-1">
+                {phantomInstalled
+                  ? 'Switch Phantom to Devnet before paying. The app signs the reservation transaction with your wallet and records the ticket in the backend.'
+                  : 'Install Phantom, enable it in your browser, then return here and check again.'}
+              </p>
+              {!phantomInstalled && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    className="rounded-md bg-[#1d4ed8] px-3 py-2 text-[13px] font-bold text-white hover:bg-[#1e40af]"
+                    onClick={openPhantomInstall}
+                    type="button"
+                  >
+                    Install Phantom
+                  </button>
+                  <button
+                    className="rounded-md border border-[#93c5fd] bg-white px-3 py-2 text-[13px] font-bold text-[#1d4ed8] hover:bg-[#dbeafe]"
+                    onClick={refreshWalletStatus}
+                    type="button"
+                  >
+                    I installed it
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {status && <p className="mt-4 text-[14px] text-[#0a58ca]">{status}</p>}
           {reservationExpired && (

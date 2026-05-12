@@ -123,16 +123,16 @@ function TicketsPage({ onHome, onCheckout, seats = [] }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortMode, setSortMode] = useState('recommended');
   const [mapZoom, setMapZoom] = useState(1);
-  const reservedSeatIds = new Set(
-    seats.filter((seat) => seat.status === 'reserved').map((seat) => seat.id),
+  const unavailableSeatIds = new Set(
+    seats.filter((seat) => seat.status === 'reserved' || seat.status === 'held').map((seat) => seat.id),
   );
   const visibleMapPriceTags = mapPriceTags
     .map((tag) => ({ ...tag, seatId: seatIdForSection(tag.section) }))
-    .filter((tag) => !reservedSeatIds.has(tag.seatId));
+    .filter((tag) => !unavailableSeatIds.has(tag.seatId));
   const visibleTicketListings = useMemo(() => {
     const filteredListings = ticketListings.filter((listing) => {
       const text = `${listing.section} ${listing.row} ${listing.price}`.toLowerCase();
-      return !reservedSeatIds.has(listing.seatId) && text.includes(searchTerm.toLowerCase());
+      return !unavailableSeatIds.has(listing.seatId) && text.includes(searchTerm.toLowerCase());
     });
 
     if (sortMode === 'lowest') {
@@ -140,8 +140,10 @@ function TicketsPage({ onHome, onCheckout, seats = [] }) {
     }
 
     return filteredListings;
-  }, [reservedSeatIds, searchTerm, sortMode]);
-  const reservedVisibleSeats = seats.filter((seat) => seat.status === 'reserved').slice(0, 3);
+  }, [unavailableSeatIds, searchTerm, sortMode]);
+  const unavailableVisibleSeats = seats
+    .filter((seat) => seat.status === 'reserved' || seat.status === 'held')
+    .slice(0, 3);
 
   return (
     <main className="h-screen overflow-hidden bg-[#f4f5f7] text-[#06152b]">
@@ -285,9 +287,9 @@ function TicketsPage({ onHome, onCheckout, seats = [] }) {
               ))}
             </div>
           </div>
-          {reservedVisibleSeats.length > 0 && (
+          {unavailableVisibleSeats.length > 0 && (
             <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-white px-4 py-2 text-[13px] font-bold text-[#147a38] shadow-md">
-              Reserved seats hidden: {reservedVisibleSeats.map((seat) => seatLabelFromId(seat.id)).join(', ')}
+              Unavailable seats hidden: {unavailableVisibleSeats.map((seat) => seatLabelFromId(seat.id)).join(', ')}
             </div>
           )}
         </div>
@@ -361,9 +363,9 @@ function TicketsPage({ onHome, onCheckout, seats = [] }) {
               )}
             </button>
           ))}
-          {reservedVisibleSeats.length > 0 && (
+          {unavailableVisibleSeats.length > 0 && (
             <div className="px-5 py-5 text-[14px] font-semibold text-[#147a38]">
-              Bought seats are removed from available listings after the backend marks them reserved.
+              Held and bought seats are removed from available listings after the backend marks them unavailable.
             </div>
           )}
         </aside>
