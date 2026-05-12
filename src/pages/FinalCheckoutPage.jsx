@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AlertCircle, CheckCircle2, LoaderCircle, XCircle } from 'lucide-react';
 import { CheckoutHeader, ChevronIcon, FinalOrderCard, Footer, GoogleIcon, SellingFast } from '../components/TicketUi';
-import { seatLabelFromId } from '../data/ticketData';
+import { priceForSeatId, seatLabelFromId, ticketEvent } from '../data/ticketData';
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 const googleIdentityScript = 'https://accounts.google.com/gsi/client';
@@ -25,8 +26,10 @@ function FinalCheckoutPage({
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [confirmedEmail, setConfirmedEmail] = useState('');
   const [activePanel, setActivePanel] = useState(null);
+  const [paymentResult, setPaymentResult] = useState(null);
   const [secondsLeft, setSecondsLeft] = useState(10 * 60);
   const seatLabel = seatLabelFromId(selectedSeatId);
+  const price = priceForSeatId(selectedSeatId);
   const timer = formatCountdown(secondsLeft);
   const reservationExpired = secondsLeft <= 0 && !ticket;
 
@@ -90,20 +93,60 @@ function FinalCheckoutPage({
     setPaymentModalOpen(true);
   }
 
-  function handleSolanaPayment() {
+  async function handleSolanaPayment() {
     if (reservationExpired) {
       setAuthMessage('This 10-minute reservation expired. Pick the seat again to restart checkout.');
       return;
     }
-    onBuy({ email: confirmedEmail || email });
+    await handlePaymentAttempt({
+      action: () => onBuy({ email: confirmedEmail || email }),
+      pendingTitle: 'Confirming Solana payment',
+    });
   }
 
-  function handleDevnetTestPayment() {
+  async function handleDevnetTestPayment() {
     if (reservationExpired) {
       setAuthMessage('This 10-minute reservation expired. Pick the seat again to restart checkout.');
       return;
     }
-    onTestBuy({ email: confirmedEmail || email });
+    await handlePaymentAttempt({
+      action: () => onTestBuy({ email: confirmedEmail || email }),
+      pendingTitle: 'Confirming test checkout',
+    });
+  }
+
+  async function handlePaymentAttempt({ action, pendingTitle }) {
+    setPaymentModalOpen(false);
+    setPaymentResult({
+      type: 'pending',
+      title: pendingTitle,
+      message: 'Please wait while the reservation is confirmed.',
+    });
+
+    try {
+      const result = await action();
+      if (result?.ok) {
+        setPaymentResult({
+          type: 'success',
+          title: 'Payment successful',
+          message: result.message || 'Your ticket was reserved successfully.',
+          ticketId: result.ticket?.id,
+        });
+        return;
+      }
+
+      setPaymentResult({
+        type: 'error',
+        title: isDeniedPayment(result?.message) ? 'Payment denied' : 'Payment failed',
+        message: result?.message || 'The reservation could not be completed.',
+      });
+    } catch (error) {
+      setPaymentResult({
+        type: 'error',
+        title: isDeniedPayment(error.message) ? 'Payment denied' : 'Payment failed',
+        message: error.message,
+      });
+    }
   }
 
   function handleGoogleSignIn() {
@@ -252,7 +295,7 @@ function FinalCheckoutPage({
                 .
               </p>
             </section>
-            <FinalOrderCard onDetails={() => setActivePanel(`${seatLabel}: 1 ticket, clear view, high demand, total R935 before taxes and handling fees.`)} seatLabel={seatLabel} />
+            <FinalOrderCard onDetails={() => setActivePanel(`${seatLabel}: 1 ticket, total ${price} before taxes and handling fees.`)} price={price} seatLabel={seatLabel} />
           </div>
         </div>
       </main>
@@ -266,9 +309,22 @@ function FinalCheckoutPage({
           status={status}
           ticket={ticket}
           seatLabel={seatLabel}
+          price={price}
           voiceStatus={voiceStatus}
           reservationExpired={reservationExpired}
           timer={timer}
+        />
+      )}
+      {paymentResult && (
+        <PaymentResultModal
+          result={paymentResult}
+          seatLabel={seatLabel}
+          price={price}
+          onClose={() => setPaymentResult(null)}
+          onRetry={() => {
+            setPaymentResult(null);
+            setPaymentModalOpen(true);
+          }}
         />
       )}
       {activePanel && <InfoModal message={activePanel} onClose={() => setActivePanel(null)} />}
@@ -286,6 +342,7 @@ function SolanaPaymentModal({
   status,
   ticket,
   seatLabel,
+  price,
   voiceStatus,
   reservationExpired,
   timer,
@@ -323,7 +380,7 @@ function SolanaPaymentModal({
           <div className="rounded-xl border border-gray-200 bg-[#fbfbfb] p-4">
             <div className="flex justify-between gap-4 text-[15px]">
               <span className="text-gray-500">Event</span>
-              <span className="font-bold text-gray-900">J. Cole</span>
+              <span className="font-bold text-gray-900">{ticketEvent.name}</span>
             </div>
             <div className="mt-3 flex justify-between gap-4 text-[15px]">
               <span className="text-gray-500">Seat</span>
@@ -345,7 +402,7 @@ function SolanaPaymentModal({
             </div>
             <div className="mt-3 flex justify-between gap-4 border-t border-gray-200 pt-3 text-[16px]">
               <span className="font-bold text-gray-900">Total</span>
-              <span className="font-bold text-gray-900">R935</span>
+              <span className="font-bold text-gray-900">{price}</span>
             </div>
           </div>
 
@@ -452,6 +509,80 @@ function InfoModal({ message, onClose }) {
       </div>
     </div>
   );
+}
+
+function PaymentResultModal({ onClose, onRetry, price, result, seatLabel }) {
+  const isPending = result.type === 'pending';
+  const isSuccess = result.type === 'success';
+  const Icon = isPending ? LoaderCircle : isSuccess ? CheckCircle2 : result.type === 'warning' ? AlertCircle : XCircle;
+  const iconClass = isPending
+    ? 'text-[#0a58ca] animate-spin'
+    : isSuccess
+      ? 'text-[#147a38]'
+      : 'text-[#e11d48]';
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-[460px] rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="flex flex-col items-center text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-50">
+            <Icon className={`h-9 w-9 ${iconClass}`} strokeWidth={2.4} />
+          </div>
+          <h2 className="mt-4 text-[24px] font-bold text-gray-900">{result.title}</h2>
+          <p className="mt-2 text-[15px] leading-relaxed text-gray-600">{result.message}</p>
+        </div>
+
+        <div className="mt-5 rounded-xl border border-gray-200 bg-[#fbfbfb] p-4 text-[14px]">
+          <div className="flex justify-between gap-4">
+            <span className="text-gray-500">Event</span>
+            <span className="font-bold text-gray-900">{ticketEvent.name}</span>
+          </div>
+          <div className="mt-3 flex justify-between gap-4">
+            <span className="text-gray-500">Seat</span>
+            <span className="font-bold text-gray-900">{seatLabel}</span>
+          </div>
+          {result.ticketId && (
+            <div className="mt-3 flex justify-between gap-4">
+              <span className="text-gray-500">Ticket</span>
+              <span className="max-w-[260px] truncate font-mono text-[12px] text-gray-900">{result.ticketId}</span>
+            </div>
+          )}
+          <div className="mt-3 flex justify-between gap-4">
+            <span className="text-gray-500">Total</span>
+            <span className="font-bold text-gray-900">{price}</span>
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-col gap-3">
+          {!isPending && !isSuccess && (
+            <button
+              className="w-full rounded-lg bg-[#111827] py-3 text-[15px] font-bold text-white hover:bg-black"
+              onClick={onRetry}
+              type="button"
+            >
+              Try again
+            </button>
+          )}
+          <button
+            className={`w-full rounded-lg py-3 text-[15px] font-bold ${
+              isPending
+                ? 'border border-gray-300 text-gray-400'
+                : 'bg-[#417516] text-white hover:bg-[#345c12]'
+            }`}
+            disabled={isPending}
+            onClick={onClose}
+            type="button"
+          >
+            {isSuccess ? 'Done' : isPending ? 'Processing...' : 'Close'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function isDeniedPayment(message = '') {
+  return /reject|denied|cancel|declined|wallet purchase limit/i.test(message);
 }
 
 function formatCountdown(seconds) {

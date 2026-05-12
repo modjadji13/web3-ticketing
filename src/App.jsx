@@ -85,8 +85,17 @@ function App() {
       setStatus(
         `Reserved ${seatLabelFromId(selectedSeatId)} in backend and on Solana devnet for ${email}: ${shortAddress(result.signature)} - ticket ${shortAddress(reservation.ticket.id)}`,
       );
+      return {
+        ok: true,
+        message: `Reserved ${seatLabelFromId(selectedSeatId)} on Solana Devnet.`,
+        ticket: reservation.ticket,
+      };
     } catch (error) {
       setStatus(error.message);
+      return {
+        ok: false,
+        message: error.message,
+      };
     } finally {
       setIsBuying(false);
     }
@@ -113,8 +122,17 @@ function App() {
       setStatus(
         `Devnet test checkout reserved ${seatLabelFromId(selectedSeatId)} for ${email}: ${shortAddress(reservation.ticket.id)}`,
       );
+      return {
+        ok: true,
+        message: `Devnet test checkout reserved ${seatLabelFromId(selectedSeatId)}.`,
+        ticket: reservation.ticket,
+      };
     } catch (error) {
       setStatus(error.message);
+      return {
+        ok: false,
+        message: error.message,
+      };
     } finally {
       setIsBuying(false);
     }
