@@ -14,39 +14,12 @@ import {
 import { useMemo, useState } from 'react';
 import {
   artistImage,
+  mapSectionLabels,
   seatIdForSection,
   seatLabelFromId,
   venueCapacity,
   venueSections,
 } from '../data/ticketData';
-
-const mapPriceTags = [
-  { section: '541', left: '29%', top: '8%', price: 'R1,093', note: '11 left' },
-  { section: '543', left: '43%', top: '5%', price: 'R1,093', note: '8 left' },
-  { section: '500', left: '62%', top: '4%', price: 'R1,093', note: '10 left' },
-  { section: '539', left: '17%', top: '17%', price: 'R1,093' },
-  { section: '538', left: '14%', top: '24%', price: 'R896' },
-  { section: '537', left: '12%', top: '32%', price: 'R772', hot: true },
-  { section: '536', left: '12%', top: '39%', price: 'R675', hot: true },
-  { section: '535', left: '13%', top: '45%', price: 'R690', note: 'Amazing' },
-  { section: '534', left: '12%', top: '52%', price: 'R675', hot: true },
-  { section: '533', left: '13%', top: '59%', price: 'R675', deal: true },
-  { section: '532', left: '13%', top: '66%', price: 'R657', value: true },
-  { section: '531', left: '17%', top: '74%', price: 'R959' },
-  { section: '530', left: '20%', top: '80%', price: 'R1,093', note: '12 left' },
-  { section: '528', left: '32%', top: '91%', price: 'R1,093' },
-  { section: '526', left: '45%', top: '92%', price: 'R1,093', note: '4 left' },
-  { section: '524', left: '58%', top: '91%', price: 'R675' },
-  { section: '231', left: '31%', top: '20%', price: 'R2,519', note: '5 left' },
-  { section: '147', left: '50%', top: '24%', price: 'R2,221' },
-  { section: '225', left: '29%', top: '66%', price: 'R4,882', note: '8 left' },
-  { section: '222', left: '38%', top: '79%', price: 'R2,519', note: '4 left' },
-  { section: '125', left: '65%', top: '75%', price: 'R3,663', note: '2 left' },
-  { section: '217', left: '73%', top: '81%', price: 'R3,350', note: '2 left' },
-  { section: 'VIP', left: '54%', top: '14%', price: 'R8,993', note: '2 left' },
-  { section: 'GA', left: '48%', top: '49%', price: 'R2,321', note: '3 left' },
-  { section: 'FRONT', left: '63%', top: '49%', price: 'R5,466', note: '2 left' },
-];
 
 const ticketListings = [
   {
@@ -117,6 +90,19 @@ const ticketListings = [
   },
 ];
 
+function sectionKeyForSeat(seatId) {
+  if (seatId.startsWith('GENERAL-ADMISSION')) return 'GA';
+  if (seatId.startsWith('FRONT-ZONE')) return 'FRONT';
+  if (seatId.startsWith('VIP')) return 'VIP';
+  return seatId.split('-')[0];
+}
+
+function formatTicketsLeft(count, fallback) {
+  if (count == null) return fallback || '';
+  if (count >= 1000) return `${count.toLocaleString()} left`;
+  return `${count} left`;
+}
+
 function TicketsPage({ onHome, onCheckout, seats = [] }) {
   const [favorite, setFavorite] = useState(false);
   const [message, setMessage] = useState('');
@@ -126,9 +112,23 @@ function TicketsPage({ onHome, onCheckout, seats = [] }) {
   const unavailableSeatIds = new Set(
     seats.filter((seat) => seat.status === 'reserved' || seat.status === 'held').map((seat) => seat.id),
   );
-  const visibleMapPriceTags = mapPriceTags
-    .map((tag) => ({ ...tag, seatId: seatIdForSection(tag.section) }))
-    .filter((tag) => !unavailableSeatIds.has(tag.seatId));
+  const sectionAvailability = seats.reduce((counts, seat) => {
+    if (seat.status !== 'available') return counts;
+    const section = sectionKeyForSeat(seat.id);
+    counts.set(section, (counts.get(section) || 0) + 1);
+    return counts;
+  }, new Map());
+  const visibleMapPriceTags = mapSectionLabels
+    .map((tag) => {
+      const availableCount = seats.length ? sectionAvailability.get(tag.section) || 0 : null;
+      return {
+        ...tag,
+        availableCount,
+        note: formatTicketsLeft(availableCount, tag.note),
+        seatId: seatIdForSection(tag.section),
+      };
+    })
+    .filter((tag) => tag.availableCount !== 0 && !unavailableSeatIds.has(tag.seatId));
   const visibleTicketListings = useMemo(() => {
     const filteredListings = ticketListings.filter((listing) => {
       const text = `${listing.section} ${listing.row} ${listing.price}`.toLowerCase();
@@ -267,15 +267,15 @@ function TicketsPage({ onHome, onCheckout, seats = [] }) {
                   style={{ left, top }}
                   title={`${section} maps to backend seat ${seatId}`}
                 >
-                  <span className="flex items-center gap-1 text-[13px] font-bold text-gray-900 leading-none">
-                    {hot && <Flame size={14} fill="currentColor" className="text-[#e60046]" />}
-                    {deal && <Tag size={14} fill="currentColor" className="text-[#7c3aed]" />}
+                  <span className="flex items-center gap-1 text-[11px] font-bold text-gray-900 leading-none">
+                    {hot && <Flame size={12} fill="currentColor" className="text-[#e60046]" />}
+                    {deal && <Tag size={12} fill="currentColor" className="text-[#7c3aed]" />}
                     {value && <span className="text-[#147a38]">$</span>}
                     {price}
                   </span>
                   {note && (
                     <span
-                      className={`text-[11px] font-extrabold mt-1 mb-0.5 leading-none ${
+                      className={`text-[9px] font-extrabold mt-1 mb-0.5 leading-none ${
                         note === 'Amazing' ? 'text-[#147a38]' : 'text-[#d9147d]'
                       }`}
                     >
