@@ -44,9 +44,19 @@ async function reserveSeatInBackend(event, chainResult, seatId = DEFAULT_SEAT_ID
     method: 'POST',
     body: JSON.stringify({
       wallet_address: chainResult.owner,
+      hold_wallet_address: chainResult.holdWalletAddress,
       payment_signature: chainResult.signature,
       onchain_ticket_address: chainResult.ticketPda,
       metadata_uri: `ipfs://j-cole-${seatId}`,
+    }),
+  });
+}
+
+async function holdSeatInBackend(event, seatId = DEFAULT_SEAT_ID, holdWalletAddress) {
+  return apiRequest(`/api/events/${event.id}/seats/${seatId}/hold`, {
+    method: 'POST',
+    body: JSON.stringify({
+      wallet_address: holdWalletAddress,
     }),
   });
 }
@@ -92,4 +102,11 @@ function shortAddress(address) {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
 
-export { ensureBackendEvent, listSeats, playVoiceConfirmation, reserveSeatInBackend, shortAddress };
+export {
+  ensureBackendEvent,
+  holdSeatInBackend,
+  listSeats,
+  playVoiceConfirmation,
+  reserveSeatInBackend,
+  shortAddress,
+};

@@ -112,6 +112,7 @@ struct HoldSeatRequest {
 #[derive(Deserialize)]
 struct ReserveSeatRequest {
     wallet_address: String,
+    hold_wallet_address: Option<String>,
     payment_signature: Option<String>,
     onchain_ticket_address: Option<String>,
     metadata_uri: Option<String>,
@@ -368,13 +369,17 @@ async fn hold_seat(
     Json(payload): Json<HoldSeatRequest>,
 ) -> ApiResult<Seat> {
     expire_holds(&state.db, event_id).await?;
-    let expires_at = Utc::now() + Duration::minutes(5);
+    let expires_at = Utc::now() + Duration::minutes(10);
 
     let row = sqlx::query(
         r#"
         UPDATE seats
         SET status = 'held', hold_wallet_address = $3, hold_expires_at = $4
-        WHERE event_id = $1 AND id = $2 AND status = 'available'
+        WHERE event_id = $1 AND id = $2
+          AND (
+            status = 'available'
+            OR (status = 'held' AND hold_wallet_address = $3)
+          )
         RETURNING *
         "#,
     )
@@ -441,9 +446,17 @@ async fn reserve_seat(
     )
     .await?;
 
+    let hold_matches_checkout = |hold: &SeatHold| {
+        hold.wallet_address == payload.wallet_address
+            || payload
+                .hold_wallet_address
+                .as_deref()
+                .is_some_and(|wallet| wallet == hold.wallet_address)
+    };
+
     match (&seat.status, &seat.hold) {
         (SeatStatus::Available, _) => {}
-        (SeatStatus::Held, Some(hold)) if hold.wallet_address == payload.wallet_address => {}
+        (SeatStatus::Held, Some(hold)) if hold_matches_checkout(hold) => {}
         (SeatStatus::Held, _) => return Err(bad_request("seat is held by another wallet")),
         _ => return Err(bad_request("seat is not available")),
     }

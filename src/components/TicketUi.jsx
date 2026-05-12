@@ -252,7 +252,7 @@ function ListingsSidebar({ onCheckout }) {
   );
 }
 
-function CheckoutHeader({ onBack, timer }) {
+function CheckoutHeader({ onBack, timer, onCurrency, onLanguage }) {
   return (
     <header className="border-b border-gray-200 bg-white z-50 flex-shrink-0 sticky top-0">
       <div className="px-6 h-[72px] flex items-center justify-between max-w-[1400px] mx-auto w-full">
@@ -279,8 +279,16 @@ function CheckoutHeader({ onBack, timer }) {
             <span className="text-[15px]">{timer}</span>
           </div>
           <div className="hidden md:flex items-center gap-3 border-l border-gray-200 pl-5 h-8">
-            <span className="font-bold text-gray-600">ZAR</span>
-            <span className="font-bold text-gray-600 flex items-center gap-1">EN <ChevronIcon /></span>
+            <button className="font-bold text-gray-600 hover:text-gray-900" onClick={onCurrency} type="button">
+              ZAR
+            </button>
+            <button
+              className="font-bold text-gray-600 hover:text-gray-900 flex items-center gap-1"
+              onClick={onLanguage}
+              type="button"
+            >
+              EN <ChevronIcon />
+            </button>
           </div>
         </div>
       </div>
@@ -325,7 +333,7 @@ function OrderSummary({ onFinal, seatLabel = 'Section 538 - Row G' }) {
   );
 }
 
-function FinalOrderCard({ seatLabel = 'Section 538 - Row G' }) {
+function FinalOrderCard({ onDetails, seatLabel = 'Section 538 - Row G' }) {
   return (
     <aside>
       <div className="bg-white rounded-[14px] border border-gray-200 shadow-[0_2px_12px_rgba(0,0,0,0.06)] overflow-hidden">
@@ -353,7 +361,11 @@ function FinalOrderCard({ seatLabel = 'Section 538 - Row G' }) {
               <h3 className="font-bold text-[16px] text-gray-900 mb-0.5">{seatLabel}</h3>
               <p className="text-[14px] text-gray-600">1 ticket</p>
             </div>
-            <button className="border border-gray-300 rounded-md px-4 py-1.5 text-[14px] font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+            <button
+              className="border border-gray-300 rounded-md px-4 py-1.5 text-[14px] font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              onClick={onDetails}
+              type="button"
+            >
               Details
             </button>
           </div>
@@ -403,15 +415,20 @@ function Guarantees() {
   );
 }
 
-function Footer() {
+function Footer({ onAction }) {
   return (
     <footer className="bg-white border-t border-gray-200 mt-auto flex-shrink-0">
       <div className="max-w-[1200px] mx-auto px-6 h-16 flex flex-col md:flex-row items-center justify-between text-[13px] text-gray-500 font-medium">
         <div className="flex items-center gap-4">
           {['User Agreement', 'Privacy Notice', 'Cookie Notice', 'Share'].map((item) => (
-            <a className="hover:underline hover:text-gray-800" href="#" key={item}>
+            <button
+              className="hover:underline hover:text-gray-800"
+              key={item}
+              onClick={() => onAction?.(item)}
+              type="button"
+            >
               {item}
-            </a>
+            </button>
           ))}
         </div>
         <div className="flex items-center gap-1.5 mt-2 md:mt-0">

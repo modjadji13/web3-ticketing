@@ -1,12 +1,19 @@
+import { useState } from 'react';
 import { Badge, CheckoutHeader, Feature, Footer, OrderSummary, SellingFast, StadiumMap } from '../components/TicketUi';
 import { seatLabelFromId } from '../data/ticketData';
 
-function CheckoutPage({ onTickets, onFinal, selectedSeatId }) {
+function CheckoutPage({ onTickets, onFinal, selectedSeatId, status }) {
+  const [message, setMessage] = useState('');
   const seatLabel = seatLabelFromId(selectedSeatId);
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <CheckoutHeader onBack={onTickets} timer="09:54" />
+      <CheckoutHeader
+        onBack={onTickets}
+        onCurrency={() => setMessage('Currency is fixed to ZAR for this demo checkout.')}
+        onLanguage={() => setMessage('Language is fixed to English for this demo checkout.')}
+        timer="10:00"
+      />
       <SellingFast />
       <main className="flex-1 bg-[#fbfbfb]">
         <div className="max-w-[1200px] mx-auto px-6 py-10 grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-10">
@@ -30,9 +37,12 @@ function CheckoutPage({ onTickets, onFinal, selectedSeatId }) {
             </div>
           </section>
           <OrderSummary onFinal={onFinal} seatLabel={seatLabel} />
+          {(status || message) && (
+            <p className="lg:col-span-2 text-[14px] text-[#0a58ca]">{status || message}</p>
+          )}
         </div>
       </main>
-      <Footer />
+      <Footer onAction={(item) => setMessage(`${item}: demo information panel for the checkout prototype.`)} />
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   Ticket,
   UserCircle,
 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import {
   artistImage,
   seatIdForSection,
@@ -117,13 +118,29 @@ const ticketListings = [
 ];
 
 function TicketsPage({ onHome, onCheckout, seats = [] }) {
+  const [favorite, setFavorite] = useState(false);
+  const [message, setMessage] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortMode, setSortMode] = useState('recommended');
+  const [mapZoom, setMapZoom] = useState(1);
   const reservedSeatIds = new Set(
     seats.filter((seat) => seat.status === 'reserved').map((seat) => seat.id),
   );
   const visibleMapPriceTags = mapPriceTags
     .map((tag) => ({ ...tag, seatId: seatIdForSection(tag.section) }))
     .filter((tag) => !reservedSeatIds.has(tag.seatId));
-  const visibleTicketListings = ticketListings.filter((listing) => !reservedSeatIds.has(listing.seatId));
+  const visibleTicketListings = useMemo(() => {
+    const filteredListings = ticketListings.filter((listing) => {
+      const text = `${listing.section} ${listing.row} ${listing.price}`.toLowerCase();
+      return !reservedSeatIds.has(listing.seatId) && text.includes(searchTerm.toLowerCase());
+    });
+
+    if (sortMode === 'lowest') {
+      return [...filteredListings].sort((a, b) => priceNumber(a.price) - priceNumber(b.price));
+    }
+
+    return filteredListings;
+  }, [reservedSeatIds, searchTerm, sortMode]);
   const reservedVisibleSeats = seats.filter((seat) => seat.status === 'reserved').slice(0, 3);
 
   return (
@@ -144,31 +161,64 @@ function TicketsPage({ onHome, onCheckout, seats = [] }) {
         </button>
 
         <div className="flex items-center gap-5">
-          <button className="w-9 h-9 rounded-full border border-slate-300 flex items-center justify-center">
-            <Heart size={18} />
+          <button
+            className="w-9 h-9 rounded-full border border-slate-300 flex items-center justify-center"
+            onClick={() => {
+              setFavorite((value) => !value);
+              setMessage(favorite ? 'Removed from favourites.' : 'Added to favourites.');
+            }}
+            type="button"
+          >
+            <Heart
+              fill={favorite ? 'currentColor' : 'none'}
+              size={18}
+            />
           </button>
-          <button className="w-9 h-9 rounded-full border border-slate-300 flex items-center justify-center">
+          <button
+            className="w-9 h-9 rounded-full border border-slate-300 flex items-center justify-center"
+            onClick={async () => {
+              const shareData = { title: 'J. Cole Tickets', url: window.location.href };
+              if (navigator.share) {
+                await navigator.share(shareData).catch(() => undefined);
+              } else {
+                await navigator.clipboard?.writeText(window.location.href);
+                setMessage('Ticket page link copied.');
+              }
+            }}
+            type="button"
+          >
             <Share2 size={17} />
           </button>
 
-          <div className="text-slate-500 font-semibold text-sm">
+          <button
+            className="text-slate-500 font-semibold text-sm hover:text-slate-900"
+            onClick={() => setMessage('Currency is fixed to ZAR and language is fixed to English for this demo.')}
+            type="button"
+          >
             ZAR <span className="mx-2 text-slate-300">|</span> EN
-          </div>
+          </button>
 
-          <div className="h-[54px] w-[365px] rounded-xl border border-slate-300 flex items-center px-4 gap-3">
+          <label className="h-[54px] w-[365px] rounded-xl border border-slate-300 flex items-center px-4 gap-3">
             <Search size={23} />
-            <span className="text-slate-500 text-[15px]">
-              Search events, artists, teams and more
-            </span>
-          </div>
+            <input
+              className="w-full bg-transparent text-[15px] outline-none placeholder:text-slate-500"
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search sections, rows, prices"
+              value={searchTerm}
+            />
+          </label>
 
           <nav className="flex items-center gap-5 font-extrabold text-[16px]">
-            <span>Sell</span>
-            <span>My Tickets</span>
-            <span>Sign In</span>
+            {['Sell', 'My Tickets', 'Sign In'].map((item) => (
+              <button key={item} onClick={() => setMessage(`${item}: demo action opened.`)} type="button">
+                {item}
+              </button>
+            ))}
           </nav>
 
-          <UserCircle size={39} className="text-[#4d871e]" />
+          <button onClick={() => setMessage('Account menu opened for the demo user.')} type="button">
+            <UserCircle size={39} className="text-[#4d871e]" />
+          </button>
         </div>
       </header>
 
@@ -180,10 +230,18 @@ function TicketsPage({ onHome, onCheckout, seats = [] }) {
       <section className="grid grid-cols-[1fr_660px] h-[calc(100vh-120px)]">
         <div className="relative bg-[#f5f6f8] overflow-hidden">
           <div className="absolute right-4 top-2 z-20 bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
-            <button className="w-11 h-10 flex items-center justify-center text-2xl font-semibold border-b">
+            <button
+              className="w-11 h-10 flex items-center justify-center text-2xl font-semibold border-b"
+              onClick={() => setMapZoom((zoom) => Math.min(1.25, Number((zoom + 0.1).toFixed(2))))}
+              type="button"
+            >
               +
             </button>
-            <button className="w-11 h-10 flex items-center justify-center text-2xl text-slate-400">
+            <button
+              className="w-11 h-10 flex items-center justify-center text-2xl text-slate-400"
+              onClick={() => setMapZoom((zoom) => Math.max(0.85, Number((zoom - 0.1).toFixed(2))))}
+              type="button"
+            >
               -
             </button>
           </div>
@@ -193,6 +251,8 @@ function TicketsPage({ onHome, onCheckout, seats = [] }) {
             style={{
               width: 'min(820px, calc(100% - 48px), calc((100vh - 152px) * 1.07))',
               aspectRatio: '1297 / 1213',
+              transform: `scale(${mapZoom})`,
+              transformOrigin: 'center',
             }}
           >
             <StadiumAvailabilityMap />
@@ -242,15 +302,24 @@ function TicketsPage({ onHome, onCheckout, seats = [] }) {
             </div>
 
             <div className="flex items-center gap-3">
-              <button className="w-10 h-10 rounded-lg border border-slate-300 flex items-center justify-center">
+              <button
+                className="w-10 h-10 rounded-lg border border-slate-300 flex items-center justify-center"
+                onClick={() => setMessage('Filters are set to one ticket, clear view, available only.')}
+                type="button"
+              >
                 <SlidersHorizontal size={19} />
               </button>
 
-              <button className="h-10 rounded-lg border border-slate-300 px-4 flex items-center gap-2 font-bold text-[15px]">
-                Recommended <ChevronDown size={17} />
+              <button
+                className="h-10 rounded-lg border border-slate-300 px-4 flex items-center gap-2 font-bold text-[15px]"
+                onClick={() => setSortMode((mode) => (mode === 'recommended' ? 'lowest' : 'recommended'))}
+                type="button"
+              >
+                {sortMode === 'recommended' ? 'Recommended' : 'Lowest price'} <ChevronDown size={17} />
               </button>
             </div>
           </div>
+          {message && <div className="px-5 py-3 text-[13px] font-semibold text-[#0a58ca]">{message}</div>}
 
           {visibleTicketListings.map((item, index) => (
             <button
@@ -301,6 +370,10 @@ function TicketsPage({ onHome, onCheckout, seats = [] }) {
       </section>
     </main>
   );
+}
+
+function priceNumber(price) {
+  return Number(price.replace(/[^\d]/g, '')) || 0;
 }
 
 function StadiumAvailabilityMap() {

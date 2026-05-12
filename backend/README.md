@@ -6,7 +6,7 @@ It models the middleware and API boundary from the architecture document:
 
 - event deployment metadata
 - live seat state
-- 5-minute seat holds
+- 10-minute seat holds
 - `reserve_seat` purchase flow
 - `mint_ticket` ticket record creation
 - capped resale via `transfer_ticket`
