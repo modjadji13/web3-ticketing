@@ -44,9 +44,19 @@ async function reserveSeatInBackend(event, chainResult, seatId = DEFAULT_SEAT_ID
     method: 'POST',
     body: JSON.stringify({
       wallet_address: chainResult.owner,
+      hold_wallet_address: chainResult.holdWalletAddress,
       payment_signature: chainResult.signature,
       onchain_ticket_address: chainResult.ticketPda,
       metadata_uri: `ipfs://j-cole-${seatId}`,
+    }),
+  });
+}
+
+async function holdSeatInBackend(event, seatId = DEFAULT_SEAT_ID, holdWalletAddress) {
+  return apiRequest(`/api/events/${event.id}/seats/${seatId}/hold`, {
+    method: 'POST',
+    body: JSON.stringify({
+      wallet_address: holdWalletAddress,
     }),
   });
 }
@@ -55,8 +65,48 @@ async function listSeats(event) {
   return apiRequest(`/api/events/${event.id}/seats`);
 }
 
+async function playVoiceConfirmation({ eventName, seatLabel, email, ticket }) {
+  const response = await fetch(`${API_URL}/api/voice/confirmation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      event_name: eventName,
+      seat_label: seatLabel,
+      email,
+      ticket_id: ticket?.id,
+    }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || 'Voice confirmation failed');
+  }
+
+  const audioBlob = await response.blob();
+  const audioUrl = URL.createObjectURL(audioBlob);
+  const audio = new Audio(audioUrl);
+
+  audio.addEventListener('ended', () => URL.revokeObjectURL(audioUrl), { once: true });
+  audio.addEventListener('error', () => URL.revokeObjectURL(audioUrl), { once: true });
+
+  try {
+    await audio.play();
+    return 'Voice confirmation played.';
+  } catch (error) {
+    URL.revokeObjectURL(audioUrl);
+    return `Voice confirmation generated, but the browser blocked autoplay: ${error.message}`;
+  }
+}
+
 function shortAddress(address) {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
 
-export { ensureBackendEvent, listSeats, reserveSeatInBackend, shortAddress };
+export {
+  ensureBackendEvent,
+  holdSeatInBackend,
+  listSeats,
+  playVoiceConfirmation,
+  reserveSeatInBackend,
+  shortAddress,
+};

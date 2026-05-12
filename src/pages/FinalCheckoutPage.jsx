@@ -5,7 +5,18 @@ import { seatLabelFromId } from '../data/ticketData';
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 const googleIdentityScript = 'https://accounts.google.com/gsi/client';
 
-function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, ticket, selectedSeatId }) {
+function FinalCheckoutPage({
+  isBuying,
+  onCheckout,
+  onBuy,
+  onTestBuy,
+  status,
+  ticket,
+  selectedSeatId,
+  voiceStatus,
+  holdExpiresAt,
+  onExpired,
+}) {
   const [email, setEmail] = useState('');
   const [emailTouched, setEmailTouched] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
@@ -13,7 +24,11 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, tic
   const [authMessage, setAuthMessage] = useState('');
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [confirmedEmail, setConfirmedEmail] = useState('');
+  const [activePanel, setActivePanel] = useState(null);
+  const [secondsLeft, setSecondsLeft] = useState(10 * 60);
   const seatLabel = seatLabelFromId(selectedSeatId);
+  const timer = formatCountdown(secondsLeft);
+  const reservationExpired = secondsLeft <= 0 && !ticket;
 
   const emailIsValid = useMemo(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), [email]);
 
@@ -44,6 +59,25 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, tic
     }
   }, []);
 
+  useEffect(() => {
+    const deadline = holdExpiresAt ? new Date(holdExpiresAt).getTime() : Date.now() + 10 * 60 * 1000;
+
+    function tick() {
+      setSecondsLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
+    }
+
+    tick();
+    const intervalId = window.setInterval(tick, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [holdExpiresAt]);
+
+  useEffect(() => {
+    if (reservationExpired) {
+      setPaymentModalOpen(false);
+      onExpired?.();
+    }
+  }, [onExpired, reservationExpired]);
+
   function handleContinue() {
     setEmailTouched(true);
     if (!emailIsValid) {
@@ -57,10 +91,18 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, tic
   }
 
   function handleSolanaPayment() {
+    if (reservationExpired) {
+      setAuthMessage('This 10-minute reservation expired. Pick the seat again to restart checkout.');
+      return;
+    }
     onBuy({ email: confirmedEmail || email });
   }
 
   function handleDevnetTestPayment() {
+    if (reservationExpired) {
+      setAuthMessage('This 10-minute reservation expired. Pick the seat again to restart checkout.');
+      return;
+    }
     onTestBuy({ email: confirmedEmail || email });
   }
 
@@ -118,7 +160,12 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, tic
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <CheckoutHeader onBack={onCheckout} timer="05:45" />
+      <CheckoutHeader
+        onBack={onCheckout}
+        onCurrency={() => setActivePanel('Currency is fixed to ZAR for this South Africa demo checkout.')}
+        onLanguage={() => setActivePanel('Language is fixed to English for this demo checkout.')}
+        timer={timer}
+      />
       <SellingFast />
       <main className="flex-1 bg-[#fbfbfb]">
         <div className="max-w-[1200px] mx-auto px-6 py-10">
@@ -165,13 +212,21 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, tic
                 </button>
               </div>
               <div className="flex justify-center mb-10">
-                <button className="text-[#0a58ca] font-medium hover:underline flex items-center justify-center gap-1 text-[15px]">
+                <button
+                  className="text-[#0a58ca] font-medium hover:underline flex items-center justify-center gap-1 text-[15px]"
+                  onClick={() => setActivePanel('Use email or Google sign-in for this prototype. Wallet payment happens in the Solana payment modal after email confirmation.')}
+                  type="button"
+                >
                   Other login options
                   <ChevronIcon />
                 </button>
               </div>
+              <p className="text-[14px] font-semibold text-[#147a38] mb-3">
+                Your selected seat is held for {timer}. Finish checkout before the timer expires.
+              </p>
               {authMessage && <p className="text-[14px] text-[#0a58ca] mb-3">{authMessage}</p>}
               {status && <p className="text-[14px] text-[#0a58ca] mb-6">{status}</p>}
+              {voiceStatus && <p className="text-[14px] text-[#147a38] mb-6">{voiceStatus}</p>}
               {ticket && (
                 <p className="text-[13px] text-gray-500 mb-6">
                   Backend ticket: {ticket.id} / seat {ticket.seat_id}
@@ -179,17 +234,25 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, tic
               )}
               <p className="text-[14px] text-gray-500 leading-relaxed max-w-[550px]">
                 By signing in or creating an account, you agree to our{' '}
-                <a className="text-[#0a58ca] hover:underline" href="#">
+                <button
+                  className="text-[#0a58ca] hover:underline"
+                  onClick={() => setActivePanel('User Agreement: tickets are reserved after payment confirms, resale is capped, and every ticket can be verified at the door.')}
+                  type="button"
+                >
                   user agreement
-                </a>{' '}
+                </button>{' '}
                 and acknowledge our{' '}
-                <a className="text-[#0a58ca] hover:underline" href="#">
+                <button
+                  className="text-[#0a58ca] hover:underline"
+                  onClick={() => setActivePanel('Privacy Policy: this prototype stores checkout email, wallet address, reservation status, and ticket verification data for the demo flow.')}
+                  type="button"
+                >
                   privacy policy
-                </a>
+                </button>
                 .
               </p>
             </section>
-            <FinalOrderCard seatLabel={seatLabel} />
+            <FinalOrderCard onDetails={() => setActivePanel(`${seatLabel}: 1 ticket, clear view, high demand, total R935 before taxes and handling fees.`)} seatLabel={seatLabel} />
           </div>
         </div>
       </main>
@@ -203,14 +266,30 @@ function FinalCheckoutPage({ isBuying, onCheckout, onBuy, onTestBuy, status, tic
           status={status}
           ticket={ticket}
           seatLabel={seatLabel}
+          voiceStatus={voiceStatus}
+          reservationExpired={reservationExpired}
+          timer={timer}
         />
       )}
-      <Footer />
+      {activePanel && <InfoModal message={activePanel} onClose={() => setActivePanel(null)} />}
+      <Footer onAction={(item) => setActivePanel(`${item}: demo information panel for the checkout prototype.`)} />
     </div>
   );
 }
 
-function SolanaPaymentModal({ email, isBuying, onClose, onPay, onTestPay, status, ticket, seatLabel }) {
+function SolanaPaymentModal({
+  email,
+  isBuying,
+  onClose,
+  onPay,
+  onTestPay,
+  status,
+  ticket,
+  seatLabel,
+  voiceStatus,
+  reservationExpired,
+  timer,
+}) {
   const [phantomInstalled, setPhantomInstalled] = useState(() => Boolean(window.solana?.isPhantom));
 
   function refreshWalletStatus() {
@@ -255,6 +334,12 @@ function SolanaPaymentModal({ email, isBuying, onClose, onPay, onTestPay, status
               <span className="font-bold text-[#147a38]">Solana Devnet</span>
             </div>
             <div className="mt-3 flex justify-between gap-4 text-[15px]">
+              <span className="text-gray-500">Reserved for</span>
+              <span className={`font-bold ${reservationExpired ? 'text-[#e11d48]' : 'text-[#147a38]'}`}>
+                {reservationExpired ? 'Expired' : timer}
+              </span>
+            </div>
+            <div className="mt-3 flex justify-between gap-4 text-[15px]">
               <span className="text-gray-500">Email</span>
               <span className="max-w-[260px] truncate font-medium text-gray-900">{email}</span>
             </div>
@@ -264,36 +349,51 @@ function SolanaPaymentModal({ email, isBuying, onClose, onPay, onTestPay, status
             </div>
           </div>
 
-          <div className="mt-5 rounded-xl border border-[#dbeafe] bg-[#eff6ff] p-4 text-[14px] text-[#1d4ed8]">
-            <div className="font-bold">
-              {phantomInstalled ? 'Phantom detected' : 'Phantom wallet required'}
+          {ticket ? (
+            <div className="mt-5 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] p-4 text-[14px] text-[#166534]">
+              <div className="font-bold">Reservation complete</div>
+              <p className="mt-1">
+                Your ticket is reserved. You can close this window and view your ticket details.
+              </p>
             </div>
-            <p className="mt-1">
-              {phantomInstalled
-                ? 'Switch Phantom to Devnet before paying. The app signs the reservation transaction with your wallet and records the ticket in the backend.'
-                : 'Install Phantom, enable it in your browser, then return here and check again.'}
-            </p>
-            {!phantomInstalled && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  className="rounded-md bg-[#1d4ed8] px-3 py-2 text-[13px] font-bold text-white hover:bg-[#1e40af]"
-                  onClick={openPhantomInstall}
-                  type="button"
-                >
-                  Install Phantom
-                </button>
-                <button
-                  className="rounded-md border border-[#93c5fd] bg-white px-3 py-2 text-[13px] font-bold text-[#1d4ed8] hover:bg-[#dbeafe]"
-                  onClick={refreshWalletStatus}
-                  type="button"
-                >
-                  I installed it
-                </button>
+          ) : (
+            <div className="mt-5 rounded-xl border border-[#dbeafe] bg-[#eff6ff] p-4 text-[14px] text-[#1d4ed8]">
+              <div className="font-bold">
+                {phantomInstalled ? 'Phantom detected' : 'Phantom wallet required'}
               </div>
-            )}
-          </div>
+              <p className="mt-1">
+                {phantomInstalled
+                  ? 'Switch Phantom to Devnet before paying. The app signs the reservation transaction with your wallet and records the ticket in the backend.'
+                  : 'Install Phantom, enable it in your browser, then return here and check again.'}
+              </p>
+              {!phantomInstalled && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    className="rounded-md bg-[#1d4ed8] px-3 py-2 text-[13px] font-bold text-white hover:bg-[#1e40af]"
+                    onClick={openPhantomInstall}
+                    type="button"
+                  >
+                    Install Phantom
+                  </button>
+                  <button
+                    className="rounded-md border border-[#93c5fd] bg-white px-3 py-2 text-[13px] font-bold text-[#1d4ed8] hover:bg-[#dbeafe]"
+                    onClick={refreshWalletStatus}
+                    type="button"
+                  >
+                    I installed it
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {status && <p className="mt-4 text-[14px] text-[#0a58ca]">{status}</p>}
+          {reservationExpired && (
+            <p className="mt-4 rounded-lg bg-[#fef1f2] px-3 py-2 text-[13px] font-semibold text-[#e11d48]">
+              This 10-minute reservation expired. Close this modal and pick the seat again.
+            </p>
+          )}
+          {voiceStatus && <p className="mt-3 text-[14px] font-medium text-[#147a38]">{voiceStatus}</p>}
           {ticket && (
             <p className="mt-3 rounded-lg bg-[#e7f5e8] px-3 py-2 text-[13px] font-semibold text-[#147a38]">
               Ticket reserved: {ticket.id} / seat {ticket.seat_id}
@@ -302,7 +402,7 @@ function SolanaPaymentModal({ email, isBuying, onClose, onPay, onTestPay, status
 
           <button
             className="mt-5 w-full rounded-lg bg-[#417516] py-3.5 text-[16px] font-bold text-white transition-colors hover:bg-[#345c12] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isBuying || Boolean(ticket) || !phantomInstalled}
+            disabled={isBuying || Boolean(ticket) || !phantomInstalled || reservationExpired}
             onClick={onPay}
             type="button"
           >
@@ -316,7 +416,7 @@ function SolanaPaymentModal({ email, isBuying, onClose, onPay, onTestPay, status
           </button>
           <button
             className="mt-3 w-full rounded-lg bg-[#111827] py-3 text-[15px] font-bold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isBuying || Boolean(ticket)}
+            disabled={isBuying || Boolean(ticket) || reservationExpired}
             onClick={onTestPay}
             type="button"
           >
@@ -334,6 +434,30 @@ function SolanaPaymentModal({ email, isBuying, onClose, onPay, onTestPay, status
       </div>
     </div>
   );
+}
+
+function InfoModal({ message, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 px-4">
+      <div className="w-full max-w-[440px] rounded-xl bg-white p-6 shadow-2xl">
+        <h2 className="text-[20px] font-bold text-gray-900">Details</h2>
+        <p className="mt-3 text-[14px] leading-relaxed text-gray-600">{message}</p>
+        <button
+          className="mt-5 w-full rounded-lg bg-[#417516] py-3 text-[15px] font-bold text-white hover:bg-[#345c12]"
+          onClick={onClose}
+          type="button"
+        >
+          OK
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function formatCountdown(seconds) {
+  const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const remainingSeconds = (seconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${remainingSeconds}`;
 }
 
 export default FinalCheckoutPage;
