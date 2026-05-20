@@ -97,7 +97,7 @@ Stretch tracks:
 ## Run Backend
 
 ```powershell
-docker compose up -d postgres
+docker compose up -d postgres redis
 cd backend
 cargo run
 ```
@@ -125,6 +125,7 @@ http://127.0.0.1:8090
 - `backend/Cargo.toml` defines the Rust backend package and dependencies.
 - `backend/Cargo.lock` locks the Rust dependency versions.
 - `docker-compose.yml` runs the local PostgreSQL database on port `5433`.
+- Redis runs locally on port `6379` and stores temporary 10-minute checkout seat holds.
 - `backend/.gitignore` keeps Rust build output out of Git.
 - `backend/.cargo/config.toml` configures the Windows GNU Rust linker workaround used on this machine.
 - `backend/.cargo/link-libs/libgcc.a` provides compiler runtime symbols for the local LLVM-MinGW linker.
