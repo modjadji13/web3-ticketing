@@ -10,7 +10,7 @@ use chrono::{DateTime, Duration, Utc};
 use redis::aio::ConnectionManager;
 use serde::{Deserialize, Serialize};
 use sqlx::{postgres::PgRow, PgPool, Postgres, QueryBuilder, Row};
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use uuid::Uuid;
 
@@ -427,16 +427,15 @@ async fn overlay_redis_holds(
     event_id: Uuid,
     seats: &mut [Seat],
 ) -> Result<(), ApiError> {
-    let holds = list_redis_holds(redis, event_id).await?;
+    let holds: HashMap<String, RedisSeatHold> = list_redis_holds(redis, event_id)
+        .await?
+        .into_iter()
+        .collect();
     for seat in seats {
         if !matches!(seat.status, SeatStatus::Available) {
             continue;
         }
-        if let Some(hold) = holds
-            .iter()
-            .find(|(held_seat_id, _)| held_seat_id == &seat.id)
-            .map(|(_, hold)| hold)
-        {
+        if let Some(hold) = holds.get(&seat.id) {
             seat.status = SeatStatus::Held;
             seat.hold = Some(SeatHold {
                 wallet_address: hold.wallet_address.clone(),
@@ -494,36 +493,11 @@ async fn create_or_refresh_redis_hold(
     }
 }
 
-async fn get_redis_hold(
-    redis: &ConnectionManager,
-    event_id: Uuid,
-    seat_id: &str,
-) -> Result<Option<RedisSeatHold>, ApiError> {
-    let mut conn = redis.clone();
-    let payload: Option<String> = redis::cmd("GET")
-        .arg(redis_hold_key(event_id, seat_id))
-        .query_async(&mut conn)
-        .await
-        .map_err(redis_error)?;
-
-    payload
-        .map(|payload| {
-            serde_json::from_str(&payload)
-                .map_err(|error| bad_request(&format!("parse seat hold failed: {error}")))
-        })
-        .transpose()
-}
-
 async fn list_redis_holds(
     redis: &ConnectionManager,
     event_id: Uuid,
 ) -> Result<Vec<(String, RedisSeatHold)>, ApiError> {
-    let mut conn = redis.clone();
-    let keys: Vec<String> = redis::cmd("KEYS")
-        .arg(redis_hold_pattern(event_id))
-        .query_async(&mut conn)
-        .await
-        .map_err(redis_error)?;
+    let keys = scan_redis_hold_keys(redis, event_id).await?;
     let mut holds = Vec::new();
 
     for key in keys {
@@ -537,6 +511,32 @@ async fn list_redis_holds(
     }
 
     Ok(holds)
+}
+
+async fn scan_redis_hold_keys(
+    redis: &ConnectionManager,
+    event_id: Uuid,
+) -> Result<Vec<String>, ApiError> {
+    let mut conn = redis.clone();
+    let mut cursor = 0_u64;
+    let mut keys = Vec::new();
+    loop {
+        let (next_cursor, mut page): (u64, Vec<String>) = redis::cmd("SCAN")
+            .arg(cursor)
+            .arg("MATCH")
+            .arg(redis_hold_pattern(event_id))
+            .arg("COUNT")
+            .arg(500)
+            .query_async(&mut conn)
+            .await
+            .map_err(redis_error)?;
+        keys.append(&mut page);
+        if next_cursor == 0 {
+            break;
+        }
+        cursor = next_cursor;
+    }
+    Ok(keys)
 }
 
 async fn get_redis_hold_by_key(
@@ -558,17 +558,108 @@ async fn get_redis_hold_by_key(
         .transpose()
 }
 
-async fn delete_redis_hold(
+async fn extend_matching_redis_hold(
     redis: &ConnectionManager,
     event_id: Uuid,
     seat_id: &str,
+    wallet_address: &str,
+    hold_wallet_address: Option<&str>,
+    ttl: Duration,
+) -> Result<(), ApiError> {
+    let lookup_hold = RedisSeatHold {
+        wallet_address: wallet_address.to_string(),
+        expires_at: Utc::now() + ttl,
+    };
+    let lookup_payload = serde_json::to_string(&lookup_hold)
+        .map_err(|error| bad_request(&format!("serialize seat hold failed: {error}")))?;
+    let checkout_hold_payload = hold_wallet_address
+        .map(|wallet| {
+            serde_json::to_string(&RedisSeatHold {
+                wallet_address: wallet.to_string(),
+                expires_at: Utc::now() + ttl,
+            })
+            .map_err(|error| bad_request(&format!("serialize seat hold failed: {error}")))
+        })
+        .transpose()?;
+    let ttl_seconds = ttl.num_seconds().max(1) as usize;
+    let mut conn = redis.clone();
+    let outcome: String = redis::Script::new(
+        r#"
+        local current = redis.call("GET", KEYS[1])
+        if not current then
+            return "missing"
+        end
+
+        local ok, decoded = pcall(cjson.decode, current)
+        if not ok then
+            return "invalid"
+        end
+
+        if decoded["wallet_address"] == ARGV[1] then
+            redis.call("SET", KEYS[1], ARGV[3], "XX", "EX", ARGV[5])
+            return "extended"
+        end
+
+        if ARGV[2] ~= "" and decoded["wallet_address"] == ARGV[2] then
+            redis.call("SET", KEYS[1], ARGV[4], "XX", "EX", ARGV[5])
+            return "extended"
+        end
+
+        return "held_by_other"
+        "#,
+    )
+    .key(redis_hold_key(event_id, seat_id))
+    .arg(wallet_address)
+    .arg(hold_wallet_address.unwrap_or(""))
+    .arg(&lookup_payload)
+    .arg(checkout_hold_payload.as_deref().unwrap_or(&lookup_payload))
+    .arg(ttl_seconds)
+    .invoke_async(&mut conn)
+    .await
+    .map_err(redis_error)?;
+
+    match outcome.as_str() {
+        "extended" => Ok(()),
+        "missing" => Err(bad_request(
+            "seat hold expired or missing; start checkout again",
+        )),
+        _ => Err(bad_request("seat is held by another checkout session")),
+    }
+}
+
+async fn delete_matching_redis_hold(
+    redis: &ConnectionManager,
+    event_id: Uuid,
+    seat_id: &str,
+    wallet_address: &str,
+    hold_wallet_address: Option<&str>,
 ) -> Result<(), ApiError> {
     let mut conn = redis.clone();
-    let _: i64 = redis::cmd("DEL")
-        .arg(redis_hold_key(event_id, seat_id))
-        .query_async(&mut conn)
-        .await
-        .map_err(redis_error)?;
+    let _: i64 = redis::Script::new(
+        r#"
+        local current = redis.call("GET", KEYS[1])
+        if not current then
+            return 0
+        end
+
+        local ok, decoded = pcall(cjson.decode, current)
+        if not ok then
+            return 0
+        end
+
+        if decoded["wallet_address"] == ARGV[1] or (ARGV[2] ~= "" and decoded["wallet_address"] == ARGV[2]) then
+            return redis.call("DEL", KEYS[1])
+        end
+
+        return 0
+        "#,
+    )
+    .key(redis_hold_key(event_id, seat_id))
+    .arg(wallet_address)
+    .arg(hold_wallet_address.unwrap_or(""))
+    .invoke_async(&mut conn)
+    .await
+    .map_err(redis_error)?;
     Ok(())
 }
 
@@ -578,21 +669,6 @@ fn redis_hold_key(event_id: Uuid, seat_id: &str) -> String {
 
 fn redis_hold_pattern(event_id: Uuid) -> String {
     format!("seat_hold:{event_id}:*")
-}
-
-fn require_matching_hold(
-    hold: Option<RedisSeatHold>,
-    wallet_address: &str,
-    hold_wallet_address: Option<&str>,
-) -> Result<(), ApiError> {
-    let hold =
-        hold.ok_or_else(|| bad_request("seat hold expired or missing; start checkout again"))?;
-    let wallet_matches = hold.wallet_address == wallet_address
-        || hold_wallet_address.is_some_and(|wallet| wallet == hold.wallet_address);
-    if !wallet_matches {
-        return Err(bad_request("seat is held by another checkout session"));
-    }
-    Ok(())
 }
 
 async fn reserve_seat(
@@ -639,11 +715,13 @@ async fn reserve_seat(
         return Err(bad_request("seat is already reserved"));
     }
 
-    let redis_hold = get_redis_hold(&state.redis, event_id, &seat_id).await?;
-    require_matching_hold(
-        redis_hold,
+    extend_matching_redis_hold(
+        &state.redis,
+        event_id,
+        &seat_id,
         &payload.wallet_address,
         payload.hold_wallet_address.as_deref(),
+        Duration::seconds(60),
     )?;
 
     enforce_wallet_limit_tx(
@@ -692,7 +770,15 @@ async fn reserve_seat(
     .map_err(db_error)?;
 
     tx.commit().await.map_err(db_error)?;
-    if let Err(error) = delete_redis_hold(&state.redis, event_id, &seat_id).await {
+    if let Err(error) = delete_matching_redis_hold(
+        &state.redis,
+        event_id,
+        &seat_id,
+        &ticket.owner_wallet,
+        payload.hold_wallet_address.as_deref(),
+    )
+    .await
+    {
         tracing::warn!(
             "reserved seat but failed to delete Redis hold: {}",
             error.error
