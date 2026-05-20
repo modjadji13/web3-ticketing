@@ -56,6 +56,7 @@ enum SeatStatus {
 
 #[derive(Clone, Deserialize, Serialize)]
 struct SeatHold {
+    #[serde(skip_serializing)]
     wallet_address: String,
     expires_at: DateTime<Utc>,
 }
@@ -462,38 +463,35 @@ async fn create_or_refresh_redis_hold(
         .map_err(|error| bad_request(&format!("serialize seat hold failed: {error}")))?;
     let ttl_seconds = ttl.num_seconds().max(1) as usize;
     let mut conn = redis.clone();
-    let created: Option<String> = redis::cmd("SET")
-        .arg(&key)
-        .arg(&payload)
-        .arg("NX")
-        .arg("EX")
-        .arg(ttl_seconds)
-        .query_async(&mut conn)
-        .await
-        .map_err(redis_error)?;
+    let outcome: String = redis::Script::new(
+        r#"
+        local current = redis.call("GET", KEYS[1])
+        if not current then
+            redis.call("SET", KEYS[1], ARGV[1], "EX", ARGV[3])
+            return "created"
+        end
 
-    if created.is_some() {
-        return Ok(hold);
+        local ok, decoded = pcall(cjson.decode, current)
+        if ok and decoded["wallet_address"] == ARGV[2] then
+            redis.call("SET", KEYS[1], ARGV[1], "EX", ARGV[3])
+            return "refreshed"
+        end
+
+        return "held_by_other"
+        "#,
+    )
+    .key(&key)
+    .arg(&payload)
+    .arg(wallet_address)
+    .arg(ttl_seconds)
+    .invoke_async(&mut conn)
+    .await
+    .map_err(redis_error)?;
+
+    match outcome.as_str() {
+        "created" | "refreshed" => Ok(hold),
+        _ => Err(bad_request("seat is held by another checkout session")),
     }
-
-    let existing = get_redis_hold(redis, event_id, seat_id).await?;
-    if existing
-        .as_ref()
-        .is_some_and(|existing| existing.wallet_address == wallet_address)
-    {
-        let mut conn = redis.clone();
-        let _: String = redis::cmd("SET")
-            .arg(&key)
-            .arg(&payload)
-            .arg("EX")
-            .arg(ttl_seconds)
-            .query_async(&mut conn)
-            .await
-            .map_err(redis_error)?;
-        return Ok(hold);
-    }
-
-    Err(bad_request("seat is held by another checkout session"))
 }
 
 async fn get_redis_hold(
@@ -604,7 +602,6 @@ async fn reserve_seat(
 ) -> ApiResult<ReserveSeatResponse> {
     expire_holds(&state.db, event_id).await?;
     require_non_empty("wallet_address", &payload.wallet_address)?;
-    let redis_hold = get_redis_hold(&state.redis, event_id, &seat_id).await?;
     let mut tx = state.db.begin().await.map_err(db_error)?;
 
     let event = sqlx::query("SELECT * FROM events WHERE id = $1")
@@ -642,6 +639,7 @@ async fn reserve_seat(
         return Err(bad_request("seat is already reserved"));
     }
 
+    let redis_hold = get_redis_hold(&state.redis, event_id, &seat_id).await?;
     require_matching_hold(
         redis_hold,
         &payload.wallet_address,
