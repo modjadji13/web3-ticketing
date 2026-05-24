@@ -2,9 +2,12 @@ import { DEFAULT_SEAT_ID, ticketEvent } from '../data/ticketData';
 
 const API_URL = 'http://127.0.0.1:8090';
 
-async function apiRequest(path, options) {
+async function apiRequest(path, options = {}, token) {
   const response = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     ...options,
   });
   const data = await response.json();
@@ -12,6 +15,32 @@ async function apiRequest(path, options) {
     throw new Error(data.error || 'Backend request failed');
   }
   return data;
+}
+
+async function createWalletNonce(walletAddress) {
+  return apiRequest('/auth/wallet/nonce', {
+    method: 'POST',
+    body: JSON.stringify({ wallet_address: walletAddress }),
+  });
+}
+
+async function verifyWalletSignature({ walletAddress, nonceId, message, signature }) {
+  return apiRequest('/auth/wallet/verify', {
+    method: 'POST',
+    body: JSON.stringify({
+      wallet_address: walletAddress,
+      nonce_id: nonceId,
+      message,
+      signature,
+    }),
+  });
+}
+
+async function linkGoogleAccount(accessToken, token) {
+  return apiRequest('/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ access_token: accessToken }),
+  }, token);
 }
 
 async function ensureBackendEvent() {
@@ -39,26 +68,25 @@ async function ensureBackendEvent() {
   });
 }
 
-async function reserveSeatInBackend(event, chainResult, seatId = DEFAULT_SEAT_ID) {
+async function reserveSeatInBackend(event, chainResult, seatId = DEFAULT_SEAT_ID, token) {
   return apiRequest(`/api/events/${event.id}/seats/${seatId}/reserve`, {
     method: 'POST',
     body: JSON.stringify({
-      wallet_address: chainResult.owner,
       hold_wallet_address: chainResult.holdWalletAddress,
       payment_signature: chainResult.signature,
       onchain_ticket_address: chainResult.ticketPda,
       metadata_uri: `ipfs://j-cole-${seatId}`,
     }),
-  });
+  }, token);
 }
 
-async function holdSeatInBackend(event, seatId = DEFAULT_SEAT_ID, holdWalletAddress) {
+async function holdSeatInBackend(event, seatId = DEFAULT_SEAT_ID, holdWalletAddress, token) {
   return apiRequest(`/api/events/${event.id}/seats/${seatId}/hold`, {
     method: 'POST',
     body: JSON.stringify({
       wallet_address: holdWalletAddress,
     }),
-  });
+  }, token);
 }
 
 async function listSeats(event) {
@@ -103,10 +131,14 @@ function shortAddress(address) {
 }
 
 export {
+  API_URL,
+  createWalletNonce,
   ensureBackendEvent,
   holdSeatInBackend,
+  linkGoogleAccount,
   listSeats,
   playVoiceConfirmation,
   reserveSeatInBackend,
   shortAddress,
+  verifyWalletSignature,
 };

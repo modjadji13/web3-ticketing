@@ -6,12 +6,13 @@ import FinalCheckoutPage from './pages/FinalCheckoutPage';
 import {
   ensureBackendEvent,
   holdSeatInBackend,
+  linkGoogleAccount,
   listSeats,
   playVoiceConfirmation,
   reserveSeatInBackend,
   shortAddress,
 } from './services/ticketApi';
-import { reserveStaticTicketOnChain } from './services/solanaTickets';
+import { authenticateWalletWithPhantom, reserveStaticTicketOnChain } from './services/solanaTickets';
 import { DEFAULT_SEAT_ID, seatLabelFromId, ticketEvent } from './data/ticketData';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
   const [voiceStatus, setVoiceStatus] = useState('');
   const [holdWalletAddress] = useState(() => `CheckoutSession-${crypto.randomUUID()}`);
   const [holdExpiresAt, setHoldExpiresAt] = useState(null);
+  const [authSession, setAuthSession] = useState(null);
 
   useEffect(() => {
     ensureBackendEvent()
@@ -44,10 +46,12 @@ function App() {
     setStatus('');
     setVoiceStatus('');
     try {
+      const session = authSession || (await authenticateWalletWithPhantom());
+      setAuthSession(session);
       const event = backendEvent || (await ensureBackendEvent());
       setBackendEvent(event);
-      const heldSeat = await holdSeatInBackend(event, selectedSeatId, holdWalletAddress);
-      setHoldExpiresAt(heldSeat.hold?.expires_at || new Date(Date.now() + 10 * 60 * 1000).toISOString());
+      const heldSeat = await holdSeatInBackend(event, selectedSeatId, session.walletAddress, session.token);
+      setHoldExpiresAt(heldSeat.hold?.expires_at || new Date(Date.now() + 2 * 60 * 1000).toISOString());
       await refreshSeats(event);
       setPage('final');
     } catch (error) {
@@ -69,6 +73,12 @@ function App() {
     }
   }
 
+  async function linkGoogleToken(accessToken) {
+    const session = authSession || (await authenticateWalletWithPhantom());
+    setAuthSession(session);
+    return linkGoogleAccount(accessToken, session.token);
+  }
+
   async function buyOnDevnet({ email } = {}) {
     setIsBuying(true);
     setStatus('');
@@ -76,9 +86,11 @@ function App() {
     try {
       const event = backendEvent || (await ensureBackendEvent());
       setBackendEvent(event);
+      const session = authSession || (await authenticateWalletWithPhantom());
+      setAuthSession(session);
       const result = await reserveStaticTicketOnChain(selectedSeatId);
-      result.holdWalletAddress = holdWalletAddress;
-      const reservation = await reserveSeatInBackend(event, result, selectedSeatId);
+      result.holdWalletAddress = session.walletAddress;
+      const reservation = await reserveSeatInBackend(event, result, selectedSeatId, session.token);
       setTicket(reservation.ticket);
       await confirmReservationByVoice({ email, reservedTicket: reservation.ticket, seatId: selectedSeatId });
       await refreshSeats(event);
@@ -108,14 +120,16 @@ function App() {
     try {
       const event = backendEvent || (await ensureBackendEvent());
       setBackendEvent(event);
+      const session = authSession || (await authenticateWalletWithPhantom());
+      setAuthSession(session);
       const timestamp = Date.now();
       const result = {
-        owner: 'DevnetTestWallet111111111111111111111111111111',
-        holdWalletAddress,
+        owner: session.walletAddress,
+        holdWalletAddress: session.walletAddress,
         signature: `devnet-test-payment-${timestamp}`,
         ticketPda: `devnet-test-ticket-${timestamp}`,
       };
-      const reservation = await reserveSeatInBackend(event, result, selectedSeatId);
+      const reservation = await reserveSeatInBackend(event, result, selectedSeatId, session.token);
       setTicket(reservation.ticket);
       await confirmReservationByVoice({ email, reservedTicket: reservation.ticket, seatId: selectedSeatId });
       await refreshSeats(event);
@@ -169,6 +183,7 @@ function App() {
           onCheckout={() => setPage('checkout')}
           onBuy={buyOnDevnet}
           onTestBuy={buyWithDevnetTest}
+          onGoogleToken={linkGoogleToken}
           status={status}
           ticket={ticket}
           selectedSeatId={selectedSeatId}
@@ -176,7 +191,7 @@ function App() {
           holdExpiresAt={holdExpiresAt}
           onExpired={() => {
             setTicket(null);
-            setStatus('This reservation expired. Pick the seat again to restart the 10-minute checkout hold.');
+            setStatus('This reservation expired. Pick the seat again to restart the 2-minute checkout hold.');
             setHoldExpiresAt(null);
             setPage('tickets');
             refreshSeats();

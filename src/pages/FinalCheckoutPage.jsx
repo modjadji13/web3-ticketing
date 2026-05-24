@@ -10,6 +10,7 @@ function FinalCheckoutPage({
   isBuying,
   onCheckout,
   onBuy,
+  onGoogleToken,
   onTestBuy,
   status,
   ticket,
@@ -27,7 +28,7 @@ function FinalCheckoutPage({
   const [confirmedEmail, setConfirmedEmail] = useState('');
   const [activePanel, setActivePanel] = useState(null);
   const [paymentResult, setPaymentResult] = useState(null);
-  const [secondsLeft, setSecondsLeft] = useState(10 * 60);
+  const [secondsLeft, setSecondsLeft] = useState(2 * 60);
   const seatLabel = seatLabelFromId(selectedSeatId);
   const price = priceForSeatId(selectedSeatId);
   const timer = formatCountdown(secondsLeft);
@@ -63,7 +64,7 @@ function FinalCheckoutPage({
   }, []);
 
   useEffect(() => {
-    const deadline = holdExpiresAt ? new Date(holdExpiresAt).getTime() : Date.now() + 10 * 60 * 1000;
+    const deadline = holdExpiresAt ? new Date(holdExpiresAt).getTime() : Date.now() + 2 * 60 * 1000;
 
     function tick() {
       setSecondsLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
@@ -95,7 +96,7 @@ function FinalCheckoutPage({
 
   async function handleSolanaPayment() {
     if (reservationExpired) {
-      setAuthMessage('This 10-minute reservation expired. Pick the seat again to restart checkout.');
+      setAuthMessage('This 2-minute reservation expired. Pick the seat again to restart checkout.');
       return;
     }
     await handlePaymentAttempt({
@@ -106,7 +107,7 @@ function FinalCheckoutPage({
 
   async function handleDevnetTestPayment() {
     if (reservationExpired) {
-      setAuthMessage('This 10-minute reservation expired. Pick the seat again to restart checkout.');
+      setAuthMessage('This 2-minute reservation expired. Pick the seat again to restart checkout.');
       return;
     }
     await handlePaymentAttempt({
@@ -176,20 +177,14 @@ function FinalCheckoutPage({
         }
 
         try {
-          const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: {
-              Authorization: `Bearer ${tokenResponse.access_token}`,
-            },
-          });
-          const profile = await response.json();
-
-          if (!response.ok || !profile.email) {
-            throw new Error(profile.error_description || 'Google did not return an email address.');
+          const user = await onGoogleToken(tokenResponse.access_token);
+          if (!user.email) {
+            throw new Error('Google did not return an email address.');
           }
 
-          setEmail(profile.email);
+          setEmail(user.email);
           setEmailTouched(true);
-          setAuthMessage(`Signed in with Google as ${profile.email}`);
+          setAuthMessage(`Signed in with Google as ${user.email}`);
         } catch (error) {
           setAuthMessage(error.message);
         } finally {
@@ -447,7 +442,7 @@ function SolanaPaymentModal({
           {status && <p className="mt-4 text-[14px] text-[#0a58ca]">{status}</p>}
           {reservationExpired && (
             <p className="mt-4 rounded-lg bg-[#fef1f2] px-3 py-2 text-[13px] font-semibold text-[#e11d48]">
-              This 10-minute reservation expired. Close this modal and pick the seat again.
+              This 2-minute reservation expired. Close this modal and pick the seat again.
             </p>
           )}
           {voiceStatus && <p className="mt-3 text-[14px] font-medium text-[#147a38]">{voiceStatus}</p>}

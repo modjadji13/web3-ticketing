@@ -1,10 +1,42 @@
 import { clusterApiUrl, Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
 import { DEFAULT_SEAT_ID, ticketEvent } from '../data/ticketData';
+import { createWalletNonce, verifyWalletSignature } from './ticketApi';
 
 const PROGRAM_ID = new PublicKey('35wzuQvuh6PkqoTe8sgZu8hx8cV4sG2G8h89zELaLmKD');
 const INITIALIZE_EVENT_DISCRIMINATOR = Uint8Array.from([126, 249, 86, 221, 202, 171, 134, 20]);
 const RESERVE_SEAT_DISCRIMINATOR = Uint8Array.from([42, 147, 222, 136, 162, 134, 183, 168]);
 const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+
+async function authenticateWalletWithPhantom() {
+  const provider = window.solana?.isPhantom ? window.solana : null;
+  if (!provider) {
+    throw new Error('Install Phantom wallet, switch it to Devnet, then try again.');
+  }
+  if (!provider.signMessage) {
+    throw new Error('Your Phantom wallet does not support message signing in this browser.');
+  }
+
+  const connected = await provider.connect();
+  const walletAddress = connected.publicKey.toString();
+  const nonce = await createWalletNonce(walletAddress);
+  const encodedMessage = new TextEncoder().encode(nonce.message);
+  const signed = await provider.signMessage(encodedMessage, 'utf8');
+  const signatureBytes = signed.signature || signed;
+  const signature = bytesToBase64(signatureBytes);
+  const auth = await verifyWalletSignature({
+    walletAddress,
+    nonceId: nonce.nonce_id,
+    message: nonce.message,
+    signature,
+  });
+
+  return {
+    token: auth.token,
+    user: auth.user,
+    walletAddress,
+    expiresAt: auth.expires_at,
+  };
+}
 
 async function reserveStaticTicketOnChain(seatId = DEFAULT_SEAT_ID) {
   const provider = window.solana?.isPhantom ? window.solana : null;
@@ -112,4 +144,12 @@ function concatBytes(...chunks) {
   return bytes;
 }
 
-export { reserveStaticTicketOnChain };
+function bytesToBase64(bytes) {
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
+export { authenticateWalletWithPhantom, reserveStaticTicketOnChain };

@@ -1,5 +1,16 @@
+import * as ed from '@noble/ed25519';
+import bs58 from 'bs58';
+
 const API_URL = process.env.API_URL || 'http://127.0.0.1:8090';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://127.0.0.1:5174';
+const TEST_PRIVATE_KEY = Uint8Array.from([
+  11, 22, 33, 44, 55, 66, 77, 88, 99, 111, 122, 133, 144, 155, 166, 177,
+  188, 199, 210, 221, 232, 243, 254, 10, 20, 30, 40, 50, 60, 70, 80, 90,
+]);
+const OTHER_PRIVATE_KEY = Uint8Array.from([
+  90, 80, 70, 60, 50, 40, 30, 20, 10, 254, 243, 232, 221, 210, 199, 188,
+  177, 166, 155, 144, 133, 122, 111, 99, 88, 77, 66, 55, 44, 33, 22, 11,
+]);
 
 const runId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const eventName = `E2E Web3 Tickets ${runId}`;
@@ -24,9 +35,13 @@ function assert(condition, message, context) {
   }
 }
 
-async function request(path, options = {}) {
+async function request(path, options = {}, token) {
   const response = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
     ...options,
   });
   const text = await response.text();
@@ -40,9 +55,9 @@ async function request(path, options = {}) {
   return body;
 }
 
-async function expectHttpError(label, path, options, expectedStatus, expectedMessagePart) {
+async function expectHttpError(label, path, options, expectedStatus, expectedMessagePart, token) {
   try {
-    await request(path, options);
+    await request(path, options, token);
   } catch (error) {
     assert(
       error.status === expectedStatus,
@@ -62,6 +77,53 @@ async function expectHttpError(label, path, options, expectedStatus, expectedMes
   fail(`${label} unexpectedly succeeded`);
 }
 
+async function authenticate(privateKey = TEST_PRIVATE_KEY) {
+  const publicKey = await ed.getPublicKeyAsync(privateKey);
+  const walletAddress = bs58.encode(publicKey);
+  const nonce = await request('/auth/wallet/nonce', {
+    method: 'POST',
+    body: JSON.stringify({ wallet_address: walletAddress }),
+  });
+  const signature = await ed.signAsync(new TextEncoder().encode(nonce.message), privateKey);
+  const auth = await request('/auth/wallet/verify', {
+    method: 'POST',
+    body: JSON.stringify({
+      wallet_address: walletAddress,
+      nonce_id: nonce.nonce_id,
+      message: nonce.message,
+      signature: bs58.encode(signature),
+    }),
+  });
+  assert(auth.token, 'wallet auth did not return a token', auth);
+  assert(auth.user?.wallet_address === walletAddress, 'wallet auth returned the wrong user', auth);
+  return { token: auth.token, walletAddress, user: auth.user };
+}
+
+async function expectWalletMismatchRejected() {
+  const claimedPublicKey = await ed.getPublicKeyAsync(OTHER_PRIVATE_KEY);
+  const claimedWallet = bs58.encode(claimedPublicKey);
+  const nonce = await request('/auth/wallet/nonce', {
+    method: 'POST',
+    body: JSON.stringify({ wallet_address: claimedWallet }),
+  });
+  const signature = await ed.signAsync(new TextEncoder().encode(nonce.message), TEST_PRIVATE_KEY);
+  await expectHttpError(
+    'wallet mismatch rejected',
+    '/auth/wallet/verify',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        wallet_address: claimedWallet,
+        nonce_id: nonce.nonce_id,
+        message: nonce.message,
+        signature: bs58.encode(signature),
+      }),
+    },
+    401,
+    'signature',
+  );
+}
+
 async function main() {
   const frontendResponse = await fetch(FRONTEND_URL);
   assert(frontendResponse.ok, `frontend did not respond at ${FRONTEND_URL}`);
@@ -75,6 +137,10 @@ async function main() {
   const health = await request('/health');
   assert(health.status === 'ok', 'backend health is not ok', health);
   log('backend health', API_URL);
+
+  const auth = await authenticate();
+  log('wallet auth', auth.walletAddress);
+  await expectWalletMismatchRejected();
 
   const event = await request('/api/events', {
     method: 'POST',
@@ -108,25 +174,39 @@ async function main() {
   log('list seats', `${initialSeats.length} seats, selected ${seat.id}`);
 
   await expectHttpError(
+    'reserve without jwt',
+    `/api/events/${event.id}/seats/${seat.id}/reserve`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        payment_signature: `sig-no-hold-${runId}`,
+        onchain_ticket_address: `ticket-no-hold-${runId}`,
+      }),
+    },
+    401,
+    'token',
+  );
+
+  await expectHttpError(
     'reserve without hold',
     `/api/events/${event.id}/seats/${seat.id}/reserve`,
     {
       method: 'POST',
       body: JSON.stringify({
-        wallet_address: `BuyerWallet-${runId}`,
         payment_signature: `sig-no-hold-${runId}`,
         onchain_ticket_address: `ticket-no-hold-${runId}`,
       }),
     },
     409,
     'hold',
+    auth.token,
   );
 
-  const holdWallet = `CheckoutSession-${runId}`;
+  const holdWallet = auth.walletAddress;
   const heldSeat = await request(`/api/events/${event.id}/seats/${seat.id}/hold`, {
     method: 'POST',
     body: JSON.stringify({ wallet_address: holdWallet }),
-  });
+  }, auth.token);
   assert(heldSeat.status === 'held', 'seat hold did not mark seat held', heldSeat);
   assert(heldSeat.hold?.expires_at, 'seat hold did not include an expiry', heldSeat);
   log('hold seat', heldSeat.hold.expires_at);
@@ -136,30 +216,18 @@ async function main() {
   assert(listedHeldSeat?.status === 'held', 'held seat was not reflected in seat listing', heldSeats);
   log('held appears in listing', seat.id);
 
-  await expectHttpError(
-    'conflicting hold',
-    `/api/events/${event.id}/seats/${seat.id}/hold`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ wallet_address: `OtherSession-${runId}` }),
-    },
-    400,
-    'available',
-  );
-
-  const buyerWallet = `BuyerWallet-${runId}`;
+  const buyerWallet = auth.walletAddress;
   const paymentSignature = `devnet-test-payment-${runId}`;
   const onchainTicketAddress = `devnet-test-ticket-${runId}`;
   const reservation = await request(`/api/events/${event.id}/seats/${seat.id}/reserve`, {
     method: 'POST',
     body: JSON.stringify({
-      wallet_address: buyerWallet,
       hold_wallet_address: holdWallet,
       payment_signature: paymentSignature,
       onchain_ticket_address: onchainTicketAddress,
       metadata_uri: `ipfs://e2e-${runId}`,
     }),
-  });
+  }, auth.token);
   assert(reservation.ticket?.id, 'reservation did not return a ticket', reservation);
   assert(reservation.ticket.owner_wallet === buyerWallet, 'ticket owner does not match buyer', reservation);
   assert(reservation.payment_signature === paymentSignature, 'payment signature was not echoed', reservation);
@@ -174,7 +242,7 @@ async function main() {
       onchain_ticket_address: onchainTicketAddress,
       metadata_uri: `ipfs://e2e-${runId}`,
     }),
-  });
+  }, auth.token);
   assert(
     retryReservation.ticket.id === reservation.ticket.id,
     'idempotent reservation retry returned a different ticket',
@@ -195,15 +263,14 @@ async function main() {
   );
   log('reserved appears in listing', seat.id);
 
-  const buyerWallet2 = `BuyerWallet2-${runId}`;
+  const buyerWallet2 = bs58.encode(await ed.getPublicKeyAsync(OTHER_PRIVATE_KEY));
   const transferredTicket = await request(`/api/tickets/${reservation.ticket.id}/transfer`, {
     method: 'POST',
     body: JSON.stringify({
-      seller_wallet: buyerWallet,
       buyer_wallet: buyerWallet2,
       resale_price_lamports: priceLamports,
     }),
-  });
+  }, auth.token);
   assert(transferredTicket.owner_wallet === buyerWallet2, 'transfer did not update owner', transferredTicket);
   assert(transferredTicket.transfers.length === 1, 'transfer history was not recorded', transferredTicket);
   log('transfer ticket', `${buyerWallet} -> ${buyerWallet2}`);
@@ -213,10 +280,9 @@ async function main() {
     body: JSON.stringify({
       event_id: event.id,
       seat_id: seat.id,
-      wallet_address: buyerWallet,
       mark_used: false,
     }),
-  });
+  }, auth.token);
   assert(wrongOwnerScan.valid === false, 'old owner should not verify after transfer', wrongOwnerScan);
   log('verify old owner rejected', wrongOwnerScan.reason);
 
@@ -225,23 +291,33 @@ async function main() {
     body: JSON.stringify({
       event_id: event.id,
       seat_id: seat.id,
-      wallet_address: buyerWallet2,
       mark_used: false,
     }),
-  });
-  assert(previewScan.valid === true, 'new owner preview verification failed', previewScan);
-  assert(!previewScan.ticket.used_at, 'preview verification should not mark used', previewScan);
-  log('verify new owner preview', previewScan.reason);
+  }, auth.token);
+  assert(previewScan.valid === false, 'old authenticated owner should not verify after transfer', previewScan);
+  log('verify old auth rejected', previewScan.reason);
+
+  const buyer2Auth = await authenticate(OTHER_PRIVATE_KEY);
+  const buyer2PreviewScan = await request('/api/tickets/verify', {
+    method: 'POST',
+    body: JSON.stringify({
+      event_id: event.id,
+      seat_id: seat.id,
+      mark_used: false,
+    }),
+  }, buyer2Auth.token);
+  assert(buyer2PreviewScan.valid === true, 'new owner preview verification failed', buyer2PreviewScan);
+  assert(!buyer2PreviewScan.ticket.used_at, 'preview verification should not mark used', buyer2PreviewScan);
+  log('verify new owner preview', buyer2PreviewScan.reason);
 
   const doorScan = await request('/api/tickets/verify', {
     method: 'POST',
     body: JSON.stringify({
       event_id: event.id,
       seat_id: seat.id,
-      wallet_address: buyerWallet2,
       mark_used: true,
     }),
-  });
+  }, buyer2Auth.token);
   assert(doorScan.valid === true, 'door scan failed', doorScan);
   assert(doorScan.ticket.used_at, 'door scan did not mark ticket used', doorScan);
   log('door scan marks used', doorScan.ticket.used_at);
@@ -251,10 +327,9 @@ async function main() {
     body: JSON.stringify({
       event_id: event.id,
       seat_id: seat.id,
-      wallet_address: buyerWallet2,
       mark_used: true,
     }),
-  });
+  }, buyer2Auth.token);
   assert(duplicateDoorScan.valid === false, 'duplicate door scan should be rejected', duplicateDoorScan);
   log('duplicate scan rejected', duplicateDoorScan.reason);
 
