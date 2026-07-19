@@ -1,35 +1,69 @@
 # Web3 Ticketing
 
-React frontend scaffold with a Rust backend for the Web3 ticketing architecture.
+Blockchain ticketing for large-venue events. Seats are held and reserved through a Rust API,
+tickets are anchored to a Solana program, and checkout confirms the purchase with a
+generated voice message.
 
-## Run Frontend
+- **Frontend** — React 18 + Vite, Phantom wallet connection on Solana Devnet
+- **Backend** — Rust/Axum API with PostgreSQL persistence (90,000-seat venue inventory)
+- **On-chain** — Anchor program (`initialize_event`, `reserve_seat`, `transfer_ticket`, `verify_ticket`)
+- **Extras** — ElevenLabs voice confirmation, Google Sign-In, an MCP server for the local API
 
-```powershell
-npm run dev
-```
+## Requirements
 
-Frontend:
+- Node.js 20+
+- Rust (stable) and Cargo
+- Docker (for PostgreSQL and Redis)
+- Solana CLI + Anchor CLI — only if you build or deploy the on-chain program
+- Phantom wallet set to Devnet
 
-```text
-http://127.0.0.1:5173
-```
+## Quick start
 
-## Google Sign-In Setup
-
-Google checkout sign-in needs a Google OAuth Web client ID. Create one in Google Cloud Console, then put it in a local env file that is not committed:
+**1. Configure environment**
 
 ```powershell
 Copy-Item .env.example .env.local
-notepad .env.local
 ```
 
-Set:
+**2. Start the database**
 
-```text
-VITE_GOOGLE_CLIENT_ID=your-real-web-client-id.apps.googleusercontent.com
+```powershell
+docker compose up -d postgres
 ```
 
-For local development, add these authorized JavaScript origins to the Google OAuth client:
+**3. Start the backend** — serves `http://127.0.0.1:8090`
+
+```powershell
+cd backend
+cargo run
+```
+
+**4. Start the frontend** — serves `http://127.0.0.1:5173`
+
+```powershell
+npm install
+npm run dev
+```
+
+Fund your Phantom Devnet wallet at <https://faucet.solana.com/> before running a checkout.
+
+## Environment variables
+
+| Variable | Used by | Purpose |
+| --- | --- | --- |
+| `VITE_GOOGLE_CLIENT_ID` | frontend | Google OAuth Web client ID for checkout sign-in |
+| `GOOGLE_CLIENT_ID` | backend | Verifies Google ID tokens |
+| `DATABASE_URL` | backend | PostgreSQL connection (default port `5433`) |
+| `REDIS_URL` | backend | Redis connection |
+| `JWT_SECRET` | backend | Session signing key, 32+ random bytes |
+| `JWT_TTL_SECONDS` | backend | Session lifetime |
+| `ELEVENLABS_API_KEY` | backend | Enables voice confirmation; checkout still completes without it |
+| `ELEVENLABS_VOICE_ID` | backend | Voice to synthesize with |
+| `PORT` | backend | Override the default `8090` |
+
+The ElevenLabs key stays server-side — the browser only receives the returned MP3.
+
+For Google Sign-In, add these authorized JavaScript origins to your OAuth client:
 
 ```text
 http://127.0.0.1:5173
@@ -38,41 +72,33 @@ http://localhost:5173
 http://localhost:5174
 ```
 
-Restart Vite after changing `.env.local`.
+Restart Vite after editing `.env.local`.
 
-## ElevenLabs Voice Confirmation
-
-The checkout calls the Rust backend after a ticket reservation succeeds. The backend then calls ElevenLabs and returns MP3 audio to the browser, so the API key never ships in frontend JavaScript.
-
-Add these backend environment variables before starting `cargo run`:
+## API
 
 ```text
-ELEVENLABS_API_KEY=your-elevenlabs-api-key
-ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM
+GET  /health
+POST /auth/wallet/nonce
+POST /auth/wallet/verify
+POST /auth/google
+GET  /auth/me
+GET  /api/events
+POST /api/events
+GET  /api/events/:event_id/seats
+POST /api/events/:event_id/seats/:seat_id/hold
+POST /api/events/:event_id/seats/:seat_id/reserve
+GET  /api/tickets/:ticket_id
+POST /api/tickets/:ticket_id/transfer
+POST /api/tickets/verify
+POST /api/voice/confirmation
 ```
 
-If `ELEVENLABS_API_KEY` is missing, checkout still completes and shows that voice confirmation was skipped.
+Seat holds expire after 10 minutes. Resale through `transfer_ticket` is price-capped.
 
-## Web3 Setup
+## On-chain program
 
-- Install Phantom and switch it to Solana Devnet.
-- Get test SOL from `https://faucet.solana.com/`.
-- The frontend connects to `https://api.devnet.solana.com` through `@solana/web3.js`.
-- Seat holds and local ticket records still go through the Rust backend.
-- Checkout signs a wallet message now; the next step is replacing the local reservation placeholder with an Anchor `reserve_seat` instruction.
-
-## On-Chain Program
-
-The Anchor program lives in `programs/web3_tickets`.
-
-It defines the core on-chain instructions:
-
-- `initialize_event`
-- `reserve_seat`
-- `transfer_ticket`
-- `verify_ticket`
-
-Install the Solana and Anchor CLIs before building:
+The Anchor program lives in [programs/web3_tickets/](programs/web3_tickets/) and targets Devnet
+at program ID `35wzuQvuh6PkqoTe8sgZu8hx8cV4sG2G8h89zELaLmKD`.
 
 ```powershell
 solana config set --url devnet
@@ -81,53 +107,52 @@ anchor deploy
 anchor keys sync
 ```
 
-## Partner Tracks
+## Testing
 
-Recommended first submissions:
-
-- ElevenLabs: voice confirmation after a ticket is reserved.
-- LI.FI: cross-chain checkout route before Solana reservation.
-
-Stretch tracks:
-
-- Ledger: hardware-wallet signing for checkout.
-- Solana Mobile: mobile wallet flow.
-- Virtuals: AI ticketing agent.
-
-## Run Backend
+End-to-end smoke test against a running backend and frontend:
 
 ```powershell
-docker compose up -d postgres
-cd backend
-cargo run
+npm run test:e2e
 ```
 
-Backend:
+Override targets with `API_URL` and `FRONTEND_URL`.
+
+## MCP server
+
+An MCP server exposes the local backend to MCP clients with `health`, `list_events`,
+`list_seats`, `get_ticket`, and `verify_ticket` tools.
+
+```powershell
+npm run mcp
+```
+
+See [mcp/README.md](mcp/README.md) for client configuration.
+
+## Project structure
 
 ```text
-http://127.0.0.1:8090
+src/                        React frontend (pages, components, services)
+backend/                    Rust/Axum API and PostgreSQL persistence
+programs/web3_tickets/      Anchor on-chain program
+mcp/                        MCP server for the local backend
+scripts/                    End-to-end smoke test
+docker-compose.yml          Local PostgreSQL and Redis
 ```
 
-## File Guide
+## Scripts
 
-- `.gitignore` keeps generated folders, logs, and local bootstrap files out of Git.
-- `index.html` is the Vite HTML entry point.
-- `package.json` defines the empty React/Vite project scripts and dependencies.
-- `package-lock.json` locks the frontend dependency versions.
-- `vite.config.js` enables React support in Vite.
-- `src/main.jsx` mounts the React app.
-- `src/App.jsx` contains the minimal four-page ticket flow and Solana Devnet wallet connection.
-- `src/style.css` contains the minimal responsive UI styling.
-- `Anchor.toml` configures the Anchor workspace for Solana Devnet.
-- `programs/web3_tickets/Cargo.toml` defines the on-chain ticketing program package.
-- `programs/web3_tickets/Cargo.lock` locks the Anchor program dependency versions.
-- `programs/web3_tickets/src/lib.rs` implements event creation, seat reservation, ticket transfer, and ticket verification on-chain.
-- `backend/Cargo.toml` defines the Rust backend package and dependencies.
-- `backend/Cargo.lock` locks the Rust dependency versions.
-- `docker-compose.yml` runs the local PostgreSQL database on port `5433`.
-- `backend/.gitignore` keeps Rust build output out of Git.
-- `backend/.cargo/config.toml` configures the Windows GNU Rust linker workaround used on this machine.
-- `backend/.cargo/link-libs/libgcc.a` provides compiler runtime symbols for the local LLVM-MinGW linker.
-- `backend/.cargo/link-libs/libgcc_eh.a` provides unwind symbols for the local LLVM-MinGW linker.
-- `backend/src/main.rs` implements the Axum API for events, seat holds, reservations, transfers, and ticket verification using PostgreSQL persistence.
-- `backend/README.md` documents backend routes and integration points.
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Start the Vite dev server |
+| `npm run build` | Build the frontend for production |
+| `npm run preview` | Preview the production build |
+| `npm run test:e2e` | Run the end-to-end smoke test |
+| `npm run mcp` | Start the MCP server |
+
+## Roadmap
+
+- Move backend schema creation into versioned SQL migrations
+- Back seat holds with Redis TTL keys for high-throughput locking
+- Broadcast live seat state over WebSockets
+- Replace ticket mint placeholders with Anchor + Metaplex Bubblegum calls
+- Add LI.FI cross-chain checkout quotes
